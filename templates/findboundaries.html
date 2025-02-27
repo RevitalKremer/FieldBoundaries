@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Find Boundaries</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            max-width: 1200px;
+            margin: 20px auto;
+        }
+        .step-row {
+            display: grid;
+            grid-template-columns: 250px minmax(600px, 1fr) 150px;
+            gap: 20px;
+            align-items: start;
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            min-height: 300px;
+        }
+        .operation {
+            text-align: left;
+            padding: 20px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            height: 100%;
+        }
+        .operation h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .image-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 300px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            padding: 10px;
+        }
+        .image-preview-container {
+            position: relative;
+            display: inline-block;
+        }
+        .image-container img {
+            cursor: crosshair;
+            max-width: 100%;
+            max-height: 600px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+        }
+        .image-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .button-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .next-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 14px;
+        }
+        .next-button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .hidden {
+            display: none;
+        }
+        #uploadForm {
+            margin-top: 15px;
+        }
+        #uploadForm input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .step-instructions {
+            margin-top: 15px;
+            font-size: 14px;
+        }
+        .step-instructions ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .step-instructions li {
+            margin: 5px 0;
+        }
+        .operation strong {
+            color: #2196F3;
+        }
+        .point-marker {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            max-width: 10px;
+            max-height: 10px;
+            background-color: red;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+        .image-container div {
+            width: 100%;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="step-row" id="step1">
+        <div class="operation">
+            <h3>Step 1: Upload and Mark Image</h3>
+            <div class="step-instructions">
+                <p><strong>Instructions:</strong></p>
+                <ol>
+                    <li>Select a satellite image file</li>
+                    <li>Click on the image to mark a point inside the field</li>
+                    <li>Click "Next Step" to continue</li>
+                </ol>
+                <p><strong>Status:</strong> <span id="uploadStatus">Select an image to begin</span></p>
+            </div>
+            <form id="uploadForm">
+                <input type="file" name="image" accept="image/*" id="imageInput">
+                <input type="hidden" name="pointX" id="pointX">
+                <input type="hidden" name="pointY" id="pointY">
+                <div style="margin-top: 15px;">
+                    <div style="margin-bottom: 10px;">
+                        <label for="latitude" style="display: inline-block; width: 70px;">Latitude:</label>
+                        <input type="number" id="latitude" name="latitude" 
+                               step="0.000001" placeholder="-90 to 90"
+                               style="width: 150px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;" 
+                               required>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="longitude" style="display: inline-block; width: 70px;">Longitude:</label>
+                        <input type="number" id="longitude" name="longitude" 
+                               step="0.000001" placeholder="-180 to 180"
+                               style="width: 150px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;" 
+                               required>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="image-container">
+            <div class="image-preview-container">
+                <img id="previewImage" style="display: none;" alt="Selected Image">
+                <div class="point-marker" id="pointMarker" style="display: none;"></div>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="step1Next" disabled>Next Step</button>
+        </div>
+    </div>
+
+    <div class="step-row hidden" id="step2">
+        <div class="operation">
+            <h3>Step 2: Green Areas Mask</h3>
+            <div class="step-instructions">
+                <p><strong>Goal:</strong> Create a mask highlighting areas with similar green color as the field.</p>
+                <p><strong>Process:</strong></p>
+                <ul>
+                    <li>Analyzing green color within the red circle</li>
+                    <li>Excluding the yellow dot from analysis</li>
+                    <li>Creating mask based on similar green areas</li>
+                    <li>White pixels: Similar to field's green</li>
+                    <li>Black pixels: Different colors</li>
+                </ul>
+                <p><strong>Status:</strong> <span id="step2Status">Waiting to process...</span></p>
+            </div>
+        </div>
+        <div class="image-container">
+            <div>
+                <img id="processedImage" src="" alt="Original with Circle">
+                <div class="image-label">Original with Circle</div>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="step2Next" disabled>Next Step</button>
+        </div>
+    </div>
+
+    <div class="step-row hidden" id="step3">
+        <div class="operation">
+            <h3>Step 3: Black Mask (Pixel Density)</h3>
+            <div class="step-instructions">
+                <p><strong>Goal:</strong> Create field shape mask using pixel density analysis.</p>
+                <p><strong>Process:</strong></p>
+                <ul>
+                    <li>Analyzing pixel windows</li>
+                    <li>Calculating green pixel density in each window</li>
+                    <li>White regions: High density of field pixels</li>
+                    <li>Black regions: Low density or non-field areas</li>
+                </ul>
+                <p><strong>Status:</strong> <span id="step3Status">Waiting to process...</span></p>
+            </div>
+        </div>
+        <div class="image-container">
+            <div>
+                <img id="greenMaskImage" src="" alt="Green Mask">
+                <div class="image-label">Green Mask</div>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="step3Next" disabled>Next Step</button>
+        </div>
+    </div>
+
+    <div class="step-row hidden" id="step4">
+        <div class="operation">
+            <h3>Step 4: Main Shape Identification</h3>
+            <div class="step-instructions">
+                <p><strong>Goal:</strong> Identify the main field shape containing the selected point.</p>
+                <p><strong>Process:</strong></p>
+                <ul>
+                    <li>Detecting all shapes in the density mask</li>
+                    <li>Finding shape containing original point</li>
+                    <li>Cyan: Main field shape</li>
+                    <li>Red: Other detected areas</li>
+                </ul>
+                <p><strong>Window Size:</strong> 
+                    <input type="range" id="windowSize" min="1" max="20" value="1" style="width: 100px;">
+                    <span id="windowSizeValue">1px</span>
+                    <button class="next-button" id="applyWindowSize" 
+                            style="width: auto; padding: 5px 10px; margin-left: 10px;">
+                        Apply
+                    </button>
+                </p>
+                <p><strong>Status:</strong> <span id="step4Status">Waiting to process...</span></p>
+            </div>
+        </div>
+        <div class="image-container">
+            <div>
+                <img id="mainShapeImage" src="" alt="Main Shape">
+                <div class="image-label">Main Shape</div>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="step4Next" disabled>Next Step</button>
+        </div>
+    </div>
+
+    <div class="step-row hidden" id="step4_1">
+        <div class="operation">
+            <h3>Step 4.1: Edge Smoothing</h3>
+            <div class="step-instructions">
+                <p><strong>Goal:</strong> Smooth the edges of the field shape.</p>
+                <p><strong>Process:</strong></p>
+                <ul>
+                    <li>Apply morphological operations</li>
+                    <li>Remove jagged edges</li>
+                    <li>Create natural field boundaries</li>
+                </ul>
+                <p><strong>Smoothing Factor:</strong> 
+                    <input type="range" id="epsilonFactor" 
+                           min="0.0001" max="0.01" value="0.01" step="0.0001" 
+                           style="width: 100px;">
+                    <span id="epsilonValue">0.0100</span>
+                    <button class="next-button" id="applySmoothing" 
+                            style="width: auto; padding: 5px 10px; margin-left: 10px;">
+                        Apply
+                    </button>
+                </p>
+                <p><strong>Status:</strong> <span id="step4_1Status">Waiting to process...</span></p>
+            </div>
+        </div>
+        <div class="image-container">
+            <div>
+                <img id="smoothedShapeImage" src="" alt="Smoothed Shape">
+                <div class="image-label">Smoothed Shape</div>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="step4_1Next" disabled>Next Step</button>
+        </div>
+    </div>
+
+    <div class="step-row hidden" id="step5">
+        <div class="operation">
+            <h3>Step 5: Field Area Isolation</h3>
+            <div class="step-instructions">
+                <p><strong>Goal:</strong> Isolate the identified field area in the original image.</p>
+                <p><strong>Process:</strong></p>
+                <ul>
+                    <li>Creating mask from magenta area</li>
+                    <li>Applying mask to original image</li>
+                    <li>Setting non-field areas to white</li>
+                    <li>Preserving original colors in field area</li>
+                </ul>
+                <p><strong>Status:</strong> <span id="step5Status">Waiting to process...</span></p>
+            </div>
+        </div>
+        <div class="image-container">
+            
+            <div>
+                <img id="maskedFieldImage" src="" alt="Masked Field">
+                <div class="image-label">Masked Field</div>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="step5Next" disabled>Next Step</button>
+        </div>
+    </div>
+
+    <div class="step-row hidden" id="step6">
+        <div class="operation">
+            <h3>Step 6: Refinement</h3>
+            <div class="step-instructions">
+                <p><strong>Goal:</strong> Refine the field area by reapplying the process.</p>
+                <p><strong>Process:</strong></p>
+                <ul>
+                    <li>A: Reapply green color detection</li>
+                    <li>B: Create new density mask</li>
+                    <li>C: Identify connected shape</li>
+                    <li>D: Final field isolation</li>
+                </ul>
+                <p><strong>Status:</strong> <span id="step6Status">Waiting to process...</span></p>
+            </div>
+        </div>
+        <div class="image-container">
+            <div>
+                <img id="grayOverlay" src="/gray_overlay" alt="Original Image">
+                <div class="image-label">Original Image</div>
+            </div>
+            <div>
+                <img id="step6Image" src="" alt="Current Step Result">
+                <div class="image-label">Current Step Result</div>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="step6NextA" disabled>Next (Green Mask)</button>
+            <button class="next-button" id="step6NextB" disabled style="display: none;">Next (Density)</button>
+            <button class="next-button" id="step6NextC" disabled style="display: none;">Next (Shape)</button>
+            <button class="next-button" id="step6NextD" disabled style="display: none;">Finish</button>
+        </div>
+    </div>
+
+    <script>
+        let selectedPoint = null;
+
+        document.getElementById('imageInput').onchange = function(e) {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.getElementById('previewImage');
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                    document.getElementById('pointMarker').style.display = 'none';
+                    document.getElementById('step1Next').disabled = true;
+                    document.getElementById('uploadStatus').textContent = 'Click on the image to mark the field point';
+                }
+                reader.readAsDataURL(file);
+            }
+        };
+
+        document.getElementById('previewImage').onclick = function(e) {
+            const rect = this.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const scaleX = this.naturalWidth / this.width;
+            const scaleY = this.naturalHeight / this.height;
+            
+            selectedPoint = {
+                x: Math.round(x * scaleX),
+                y: Math.round(y * scaleY)
+            };
+
+            const marker = document.getElementById('pointMarker');
+            marker.style.left = x + 'px';
+            marker.style.top = y + 'px';
+            marker.style.display = 'block';
+
+            document.getElementById('pointX').value = selectedPoint.x;
+            document.getElementById('pointY').value = selectedPoint.y;
+            
+            document.getElementById('step1Next').disabled = false;
+            document.getElementById('uploadStatus').textContent = 'Point selected. Click "Next Step" to continue.';
+        };
+
+        function updateStepImages(resultImgElement, imagePath, useOverlay = false) {
+            resultImgElement.src = '/display/' + imagePath + '?' + new Date().getTime();
+            
+            if (useOverlay) {
+                const container = resultImgElement.parentElement.parentElement;
+                const overlayImg = container.querySelector('img:first-of-type');
+                overlayImg.src = '/gray_overlay?' + new Date().getTime();
+            }
+        }
+
+        document.getElementById('step1Next').onclick = function() {
+            if (!selectedPoint) return;
+            
+            const formData = new FormData(document.getElementById('uploadForm'));
+            document.getElementById('uploadStatus').textContent = 'Processing...';
+            
+            fetch('/process_step1_upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(result => {
+                if (result === 'success') {
+                    document.getElementById('uploadStatus').textContent = 'Processing complete!';
+                    document.getElementById('step2').classList.remove('hidden');
+                    updateStepImages(document.getElementById('processedImage'), 'processed_image.jpg');
+                    document.getElementById('step2Next').disabled = false;
+                    document.getElementById('step2').scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    document.getElementById('uploadStatus').textContent = 'Error: ' + result;
+                }
+            });
+        };
+
+        document.getElementById('step2Next').onclick = function() {
+            document.getElementById('step3').classList.remove('hidden');
+            document.getElementById('step3Status').textContent = 'Processing...';
+            
+            fetch('/process_step2')
+                .then(response => response.text())
+                .then(result => {
+                    if (result === 'success') {
+                        updateStepImages(document.getElementById('greenMaskImage'), 'green_mask.jpg');
+                        document.getElementById('step3Status').textContent = 'Processing complete!';
+                        document.getElementById('step3Next').disabled = false;
+                        document.getElementById('step3').scrollIntoView({ behavior: 'smooth' });
+                    } else {
+                        document.getElementById('step3Status').textContent = 'Error: ' + result;
+                    }
+                });
+        };
+
+        document.getElementById('step3Next').onclick = function() {
+            document.getElementById('step4').classList.remove('hidden');
+            document.getElementById('step4Status').textContent = 'Processing with default window size (1px)...';
+            document.getElementById('step4').scrollIntoView({ behavior: 'smooth' });
+            
+            // Automatically process with default window size
+            const formData = new FormData();
+            formData.append('windowSize', '1');
+            
+            fetch('/process_step3', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(result => {
+                if (result === 'success') {
+                    fetch('/process_step4')
+                        .then(response => response.text())
+                        .then(result => {
+                            if (result === 'success') {
+                                updateStepImages(document.getElementById('mainShapeImage'), 'main_shape.jpg');
+                                document.getElementById('step4Status').textContent = 
+                                    'Processing complete! (Window size: 1px). Adjust slider and click Apply to refine.';
+                                document.getElementById('step4Next').disabled = false;
+                            } else {
+                                document.getElementById('step4Status').textContent = 'Error: ' + result;
+                            }
+                        });
+                } else {
+                    document.getElementById('step4Status').textContent = 'Error: ' + result;
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        };
+
+        document.getElementById('windowSize').oninput = function() {
+            document.getElementById('windowSizeValue').textContent = this.value + 'px';
+        };
+
+        document.getElementById('applyWindowSize').onclick = function() {
+            const windowSize = document.getElementById('windowSize').value;
+            document.getElementById('step4Status').textContent = 'Processing...';
+            
+            const formData = new FormData();
+            formData.append('windowSize', windowSize);
+            
+            fetch('/process_step3', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(result => {
+                if (result === 'success') {
+                    fetch('/process_step4')
+                        .then(response => response.text())
+                        .then(result => {
+                            if (result === 'success') {
+                                updateStepImages(document.getElementById('mainShapeImage'), 'main_shape.jpg');
+                                document.getElementById('step4Status').textContent = 
+                                    `Processing complete! (Window size: ${windowSize}px)`;
+                                document.getElementById('step4Next').disabled = false;
+                            } else {
+                                document.getElementById('step4Status').textContent = 'Error: ' + result;
+                            }
+                        });
+                } else {
+                    document.getElementById('step4Status').textContent = 'Error: ' + result;
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        };
+
+        document.getElementById('step4Next').onclick = function() {
+            document.getElementById('step4_1').classList.remove('hidden');
+            document.getElementById('step4_1Status').textContent = 'Processing with default smoothing (0.0100)...';
+            document.getElementById('step4_1').scrollIntoView({ behavior: 'smooth' });
+            
+            // Automatically process with default epsilon factor
+            const formData = new FormData();
+            formData.append('epsilonFactor', '0.01');
+            
+            fetch('/process_step4_1', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.text())
+                .then(result => {
+                    if (result === 'success') {
+                        document.getElementById('smoothedShapeImage').src = '/display/smoothed_shape.jpg?' + new Date().getTime();
+                        document.getElementById('step4_1Status').textContent = 
+                            'Processing complete! (Smoothing: 0.0100). Adjust slider and click Apply to refine.';
+                        document.getElementById('step4_1Next').disabled = false;
+                    } else {
+                        document.getElementById('step4_1Status').textContent = 'Error: ' + result;
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        };
+
+        document.getElementById('epsilonFactor').oninput = function() {
+            const value = parseFloat(this.value).toFixed(4);
+            document.getElementById('epsilonValue').textContent = value;
+        };
+
+        document.getElementById('applySmoothing').onclick = function() {
+            const epsilonFactor = document.getElementById('epsilonFactor').value;
+            document.getElementById('step4_1Status').textContent = 'Processing...';
+            
+            const formData = new FormData();
+            formData.append('epsilonFactor', epsilonFactor);
+            
+            fetch('/process_step4_1', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.text())
+                .then(result => {
+                    if (result === 'success') {
+                        document.getElementById('smoothedShapeImage').src = '/display/smoothed_shape.jpg?' + new Date().getTime();
+                        document.getElementById('step4_1Status').textContent = 
+                            `Processing complete! (Smoothing: ${epsilonFactor})`;
+                        document.getElementById('step4_1Next').disabled = false;
+                        
+                        document.getElementById('step5').classList.add('hidden');
+                        document.getElementById('step6').classList.add('hidden');
+                        
+                        document.getElementById('step5Status').textContent = 'Waiting to process...';
+                        document.getElementById('step6Status').textContent = 'Waiting to process...';
+                        document.getElementById('maskedFieldImage').src = '';
+                        document.getElementById('step6Image').src = '';
+                        
+                        document.getElementById('step5Next').disabled = true;
+                        document.getElementById('step6NextA').disabled = true;
+                        document.getElementById('step6NextB').disabled = true;
+                        document.getElementById('step6NextC').disabled = true;
+                        document.getElementById('step6NextD').disabled = true;
+                    } else {
+                        document.getElementById('step4_1Status').textContent = 'Error: ' + result;
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        };
+
+        document.getElementById('step4_1Next').onclick = function() {
+            document.getElementById('step5').classList.remove('hidden');
+            document.getElementById('step5Status').textContent = 'Processing...';
+            
+            fetch('/process_step5')
+                .then(response => response.text())
+                .then(result => {
+                    if (result === 'success') {
+                        updateStepImages(document.getElementById('maskedFieldImage'), 'masked_field.jpg');
+                        document.getElementById('step5Status').textContent = 'Processing complete!';
+                        document.getElementById('step5Next').disabled = false;
+                        document.getElementById('step5').scrollIntoView({ behavior: 'smooth' });
+                    } else {
+                        document.getElementById('step5Status').textContent = 'Error: ' + result;
+                    }
+                });
+        };
+
+        document.getElementById('step5Next').onclick = function() {
+            // This can be removed or modified to handle the end of the process
+            document.getElementById('step5Status').textContent = 'Process complete!';
+        };
+    </script>
+</body>
+</html>
