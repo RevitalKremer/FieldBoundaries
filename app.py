@@ -1,13 +1,16 @@
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, jsonify
 import cv2
 import numpy as np
 import json
 from steps.step2 import step2_process_image
 from steps.step3 import step3_process_image
 from steps.step4 import step4_process_image
-from steps.step4_1 import smooth_shape_edges
-from steps.step5 import step5_process_image
+from steps.step5 import smooth_shape_edges
+from steps.step6 import step6_process_image
+from steps.step7 import generate_geojson
+
 import os
+from geojson import Feature, Polygon, FeatureCollection
 
 app = Flask(__name__)
 
@@ -84,7 +87,8 @@ def index():
     try:
         return render_template('findboundaries.html')
     except Exception as e:
-        return f"Error: {str(e)}"
+        app.logger.error(f"Error in index route: {str(e)}")
+        return f"Error accessing template: {str(e)}", 500
 
 @app.route('/process_step1_upload', methods=['POST'])
 def process_step1_upload():
@@ -161,8 +165,8 @@ def process_step4():
 def main_shape():
     return send_file('images/main_shape.jpg', mimetype='image/jpeg')
 
-@app.route('/process_step4_1', methods=['POST'])
-def process_step4_1():
+@app.route('/process_step5', methods=['POST'])
+def process_step5():
     epsilon_factor = float(request.form.get('epsilonFactor', 0.001))
     success, message = smooth_shape_edges('images/main_shape.jpg', epsilon_factor)
     if success:
@@ -173,10 +177,10 @@ def process_step4_1():
 def smoothed_shape():
     return send_file('images/smoothed_shape.jpg', mimetype='image/jpeg')
 
-@app.route('/process_step5')
-def process_step5():
+@app.route('/process_step6')
+def process_step6():
     # Use smoothed shape from step 4.1 instead of main shape
-    success, message = step5_process_image('images/uploaded_image.jpg', 'images/smoothed_shape.jpg')
+    success, message = step6_process_image('images/uploaded_image.jpg', 'images/smoothed_shape.jpg')
     if success:
         return 'success'
     return message
@@ -213,5 +217,80 @@ def gray_overlay():
         pass
     return send_file('images/uploaded_image.jpg', mimetype='image/jpeg')
 
+def draw_geojson_on_image():
+    """Draw the GeoJSON boundary on the original image"""
+    try:
+        # Read the masked field image to get the contours
+        masked_image = cv2.imread('images/masked_field.jpg')
+        # Read the original image to draw on
+        original_image = cv2.imread('images/uploaded_image.jpg')
+        if masked_image is None or original_image is None:
+            return False
+
+        # Convert masked image to grayscale
+        gray = cv2.cvtColor(masked_image, cv2.COLOR_BGR2GRAY)
+        
+        # Threshold to get non-white areas
+        _, thresh = cv2.threshold(gray, 250, 255, cv2.THRESH_BINARY_INV)
+        
+        # Find contours of the non-white areas
+        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        if contours:
+            # Get the largest contour (main field area)
+            main_contour = max(contours, key=cv2.contourArea)
+            
+            # Simplify the contour
+            epsilon = 0.001 * cv2.arcLength(main_contour, True)
+            simplified_contour = cv2.approxPolyDP(main_contour, epsilon, True)
+            
+            # Draw the boundary line in cyan color (BGR format) on the original image
+            cv2.polylines(original_image, [simplified_contour], True, (255, 255, 0), 2)
+            
+            # Update the GeoJSON file with the new coordinates
+            coordinates = simplified_contour.reshape(-1, 2).tolist()
+            geojson_data = {
+                "type": "FeatureCollection",
+                "features": [{
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [coordinates]
+                    },
+                    "properties": {}
+                }]
+            }
+            
+            # Save the updated GeoJSON
+            with open('images/field_boundary.geojson', 'w') as f:
+                json.dump(geojson_data, f)
+        
+        # Save the original image with boundary
+        cv2.imwrite('images/final_with_boundary.jpg', original_image)
+        return True
+    except Exception as e:
+        print(f"Error drawing GeoJSON: {str(e)}")
+        return False
+
+@app.route('/process_step7')
+def process_step7():
+    """Generate GeoJSON from the smoothed shape and draw it on the final image"""
+    success, message = generate_geojson('images/smoothed_shape.jpg')
+    if success:
+        if draw_geojson_on_image():
+            return 'success'
+    return message
+
+@app.route('/download_geojson')
+def download_geojson():
+    """Download the generated GeoJSON file"""
+    try:
+        return send_file('images/field_boundary.geojson',
+                        mimetype='application/geo+json',
+                        as_attachment=True,
+                        download_name='field_boundary.geojson')
+    except Exception as e:
+        return str(e), 400
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)

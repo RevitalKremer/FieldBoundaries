@@ -163,6 +163,7 @@
         </div>
         <div class="button-container">
             <button class="next-button" id="step1Next" disabled>Next Step</button>
+            <button class="next-button" id="runAllSteps" disabled >Run All Steps</button>
         </div>
     </div>
 
@@ -253,9 +254,9 @@
         </div>
     </div>
 
-    <div class="step-row hidden" id="step4_1">
+    <div class="step-row hidden" id="step5">
         <div class="operation">
-            <h3>Step 4.1: Edge Smoothing</h3>
+            <h3>Step 5: Edge Smoothing</h3>
             <div class="step-instructions">
                 <p><strong>Goal:</strong> Smooth the edges of the field shape.</p>
                 <p><strong>Process:</strong></p>
@@ -274,7 +275,7 @@
                         Apply
                     </button>
                 </p>
-                <p><strong>Status:</strong> <span id="step4_1Status">Waiting to process...</span></p>
+                <p><strong>Status:</strong> <span id="step5Status">Waiting to process...</span></p>
             </div>
         </div>
         <div class="image-container">
@@ -284,13 +285,13 @@
             </div>
         </div>
         <div class="button-container">
-            <button class="next-button" id="step4_1Next" disabled>Next Step</button>
+            <button class="next-button" id="step5Next" disabled>Next Step</button>
         </div>
     </div>
 
-    <div class="step-row hidden" id="step5">
+    <div class="step-row hidden" id="step6">
         <div class="operation">
-            <h3>Step 5: Field Area Isolation</h3>
+            <h3>Step 6: Field Area Isolation</h3>
             <div class="step-instructions">
                 <p><strong>Goal:</strong> Isolate the identified field area in the original image.</p>
                 <p><strong>Process:</strong></p>
@@ -300,7 +301,7 @@
                     <li>Setting non-field areas to white</li>
                     <li>Preserving original colors in field area</li>
                 </ul>
-                <p><strong>Status:</strong> <span id="step5Status">Waiting to process...</span></p>
+                <p><strong>Status:</strong> <span id="step6Status">Waiting to process...</span></p>
             </div>
         </div>
         <div class="image-container">
@@ -311,42 +312,35 @@
             </div>
         </div>
         <div class="button-container">
-            <button class="next-button" id="step5Next" disabled>Next Step</button>
+            <button class="next-button" id="step6Next" disabled>Next Step</button>
         </div>
     </div>
 
-    <div class="step-row hidden" id="step6">
+    <div class="step-row hidden" id="step7">
         <div class="operation">
-            <h3>Step 6: Refinement</h3>
+            <h3>Step 7: GeoJSON Generation</h3>
             <div class="step-instructions">
-                <p><strong>Goal:</strong> Refine the field area by reapplying the process.</p>
+                <p><strong>Goal:</strong> Generate GeoJSON file from the field boundary.</p>
                 <p><strong>Process:</strong></p>
                 <ul>
-                    <li>A: Reapply green color detection</li>
-                    <li>B: Create new density mask</li>
-                    <li>C: Identify connected shape</li>
-                    <li>D: Final field isolation</li>
+                    <li>Converting field boundary to coordinates</li>
+                    <li>Creating GeoJSON polygon</li>
+                    <li>Generating downloadable file</li>
                 </ul>
-                <p><strong>Status:</strong> <span id="step6Status">Waiting to process...</span></p>
+                <p><strong>Status:</strong> <span id="step7Status">Waiting to process...</span></p>
             </div>
         </div>
         <div class="image-container">
             <div>
-                <img id="grayOverlay" src="/gray_overlay" alt="Original Image">
-                <div class="image-label">Original Image</div>
-            </div>
-            <div>
-                <img id="step6Image" src="" alt="Current Step Result">
-                <div class="image-label">Current Step Result</div>
+                <img id="finalImage" src="" alt="Final Result">
+                <div class="image-label">Final Result</div>
             </div>
         </div>
         <div class="button-container">
-            <button class="next-button" id="step6NextA" disabled>Next (Green Mask)</button>
-            <button class="next-button" id="step6NextB" disabled style="display: none;">Next (Density)</button>
-            <button class="next-button" id="step6NextC" disabled style="display: none;">Next (Shape)</button>
-            <button class="next-button" id="step6NextD" disabled style="display: none;">Finish</button>
+            <button class="next-button" id="downloadGeoJSON" disabled>Download GeoJSON</button>
         </div>
     </div>
+
 
     <script>
         let selectedPoint = null;
@@ -361,6 +355,7 @@
                     img.style.display = 'block';
                     document.getElementById('pointMarker').style.display = 'none';
                     document.getElementById('step1Next').disabled = true;
+                    document.getElementById('runAllSteps').disabled = true;
                     document.getElementById('uploadStatus').textContent = 'Click on the image to mark the field point';
                 }
                 reader.readAsDataURL(file);
@@ -389,7 +384,8 @@
             document.getElementById('pointY').value = selectedPoint.y;
             
             document.getElementById('step1Next').disabled = false;
-            document.getElementById('uploadStatus').textContent = 'Point selected. Click "Next Step" to continue.';
+            document.getElementById('runAllSteps').disabled = false;
+            document.getElementById('uploadStatus').textContent = 'Point selected. Click "Next Step" to continue or "Run All Steps" to process automatically.';
         };
 
         function updateStepImages(resultImgElement, imagePath, useOverlay = false) {
@@ -517,15 +513,15 @@
         };
 
         document.getElementById('step4Next').onclick = function() {
-            document.getElementById('step4_1').classList.remove('hidden');
-            document.getElementById('step4_1Status').textContent = 'Processing with default smoothing (0.0100)...';
-            document.getElementById('step4_1').scrollIntoView({ behavior: 'smooth' });
+            document.getElementById('step5').classList.remove('hidden');
+            document.getElementById('step5Status').textContent = 'Processing with default smoothing (0.0100)...';
+            document.getElementById('step5').scrollIntoView({ behavior: 'smooth' });
             
             // Automatically process with default epsilon factor
             const formData = new FormData();
             formData.append('epsilonFactor', '0.01');
             
-            fetch('/process_step4_1', {
+            fetch('/process_step5', {
                 method: 'POST',
                 body: formData
             })
@@ -533,11 +529,11 @@
                 .then(result => {
                     if (result === 'success') {
                         document.getElementById('smoothedShapeImage').src = '/display/smoothed_shape.jpg?' + new Date().getTime();
-                        document.getElementById('step4_1Status').textContent = 
+                        document.getElementById('step5Status').textContent = 
                             'Processing complete! (Smoothing: 0.0100). Adjust slider and click Apply to refine.';
-                        document.getElementById('step4_1Next').disabled = false;
+                        document.getElementById('step5Next').disabled = false;
                     } else {
-                        document.getElementById('step4_1Status').textContent = 'Error: ' + result;
+                        document.getElementById('step5Status').textContent = 'Error: ' + result;
                     }
                 })
                 .catch(error => console.error('Error:', error));
@@ -550,12 +546,12 @@
 
         document.getElementById('applySmoothing').onclick = function() {
             const epsilonFactor = document.getElementById('epsilonFactor').value;
-            document.getElementById('step4_1Status').textContent = 'Processing...';
+            document.getElementById('step5Status').textContent = 'Processing...';
             
             const formData = new FormData();
             formData.append('epsilonFactor', epsilonFactor);
             
-            fetch('/process_step4_1', {
+            fetch('/process_step5', {
                 method: 'POST',
                 body: formData
             })
@@ -563,52 +559,147 @@
                 .then(result => {
                     if (result === 'success') {
                         document.getElementById('smoothedShapeImage').src = '/display/smoothed_shape.jpg?' + new Date().getTime();
-                        document.getElementById('step4_1Status').textContent = 
+                        document.getElementById('step5Status').textContent = 
                             `Processing complete! (Smoothing: ${epsilonFactor})`;
-                        document.getElementById('step4_1Next').disabled = false;
+                        document.getElementById('step5Next').disabled = false;
                         
-                        document.getElementById('step5').classList.add('hidden');
                         document.getElementById('step6').classList.add('hidden');
                         
-                        document.getElementById('step5Status').textContent = 'Waiting to process...';
                         document.getElementById('step6Status').textContent = 'Waiting to process...';
                         document.getElementById('maskedFieldImage').src = '';
-                        document.getElementById('step6Image').src = '';
                         
-                        document.getElementById('step5Next').disabled = true;
-                        document.getElementById('step6NextA').disabled = true;
-                        document.getElementById('step6NextB').disabled = true;
-                        document.getElementById('step6NextC').disabled = true;
-                        document.getElementById('step6NextD').disabled = true;
+                        document.getElementById('step6Next').disabled = true;
                     } else {
-                        document.getElementById('step4_1Status').textContent = 'Error: ' + result;
+                        document.getElementById('step5Status').textContent = 'Error: ' + result;
                     }
                 })
                 .catch(error => console.error('Error:', error));
         };
 
-        document.getElementById('step4_1Next').onclick = function() {
-            document.getElementById('step5').classList.remove('hidden');
-            document.getElementById('step5Status').textContent = 'Processing...';
+        document.getElementById('step5Next').onclick = function() {
+            document.getElementById('step6').classList.remove('hidden');
+            document.getElementById('step6Status').textContent = 'Processing...';
             
-            fetch('/process_step5')
+            fetch('/process_step6')
                 .then(response => response.text())
                 .then(result => {
                     if (result === 'success') {
                         updateStepImages(document.getElementById('maskedFieldImage'), 'masked_field.jpg');
-                        document.getElementById('step5Status').textContent = 'Processing complete!';
-                        document.getElementById('step5Next').disabled = false;
-                        document.getElementById('step5').scrollIntoView({ behavior: 'smooth' });
+                        document.getElementById('step6Status').textContent = 'Processing complete!';
+                        document.getElementById('step6Next').disabled = false;
+                        document.getElementById('step6').scrollIntoView({ behavior: 'smooth' });
                     } else {
-                        document.getElementById('step5Status').textContent = 'Error: ' + result;
+                        document.getElementById('step6Status').textContent = 'Error: ' + result;
                     }
                 });
         };
 
-        document.getElementById('step5Next').onclick = function() {
-            // This can be removed or modified to handle the end of the process
-            document.getElementById('step5Status').textContent = 'Process complete!';
+        document.getElementById('step6Next').onclick = function() {
+            document.getElementById('step7').classList.remove('hidden');
+            document.getElementById('step7Status').textContent = 'Processing...';
+            
+            fetch('/process_step7')
+                .then(response => response.text())
+                .then(result => {
+                    if (result === 'success') {
+                        document.getElementById('finalImage').src = '/display/final_with_boundary.jpg?' + new Date().getTime();
+                        document.getElementById('step7Status').textContent = 'Processing complete! GeoJSON boundary shown in cyan. Ready for download.';
+                        document.getElementById('downloadGeoJSON').disabled = false;
+                        document.getElementById('step7').scrollIntoView({ behavior: 'smooth' });
+                    } else {
+                        document.getElementById('step7Status').textContent = 'Error: ' + result;
+                    }
+                });
         };
+
+        document.getElementById('downloadGeoJSON').onclick = function() {
+            window.location.href = '/download_geojson';
+        };
+
+        async function processAllSteps() {
+            // Step 1
+            const formData = new FormData(document.getElementById('uploadForm'));
+            document.getElementById('uploadStatus').textContent = 'Processing step 1...';
+            
+            try {
+                // Process Step 1
+                const step1Result = await fetch('/process_step1_upload', {
+                    method: 'POST',
+                    body: formData
+                }).then(response => response.text());
+                
+                if (step1Result !== 'success') throw new Error('Step 1 failed');
+                document.getElementById('step2').classList.remove('hidden');
+                updateStepImages(document.getElementById('processedImage'), 'processed_image.jpg');
+                document.getElementById('step2Status').textContent = 'Processing...';
+                
+                // Process Step 2
+                const step2Result = await fetch('/process_step2').then(response => response.text());
+                if (step2Result !== 'success') throw new Error('Step 2 failed');
+                document.getElementById('step3').classList.remove('hidden');
+                updateStepImages(document.getElementById('greenMaskImage'), 'green_mask.jpg');
+                document.getElementById('step3Status').textContent = 'Processing...';
+                
+                // Process Step 3 & 4
+                const formData3 = new FormData();
+                formData3.append('windowSize', '1');
+                const step3Result = await fetch('/process_step3', {
+                    method: 'POST',
+                    body: formData3
+                }).then(response => response.text());
+                if (step3Result !== 'success') throw new Error('Step 3 failed');
+                
+                const step4Result = await fetch('/process_step4').then(response => response.text());
+                if (step4Result !== 'success') throw new Error('Step 4 failed');
+                document.getElementById('step4').classList.remove('hidden');
+                updateStepImages(document.getElementById('mainShapeImage'), 'main_shape.jpg');
+                document.getElementById('step4Status').textContent = 'Processing complete!';
+                
+                // Process Step 5
+                document.getElementById('step5').classList.remove('hidden');
+                const formData5 = new FormData();
+                formData5.append('epsilonFactor', '0.01');
+                const step5Result = await fetch('/process_step5', {
+                    method: 'POST',
+                    body: formData5
+                }).then(response => response.text());
+                if (step5Result !== 'success') throw new Error('Step 5 failed');
+                document.getElementById('smoothedShapeImage').src = '/display/smoothed_shape.jpg?' + new Date().getTime();
+                document.getElementById('step5Status').textContent = 'Processing complete!';
+                
+                // Process Step 6
+                document.getElementById('step6').classList.remove('hidden');
+                const step6Result = await fetch('/process_step6').then(response => response.text());
+                if (step6Result !== 'success') throw new Error('Step 6 failed');
+                updateStepImages(document.getElementById('maskedFieldImage'), 'masked_field.jpg');
+                document.getElementById('step6Status').textContent = 'Processing complete!';
+                
+                // Process Step 7
+                document.getElementById('step7').classList.remove('hidden');
+                const step7Result = await fetch('/process_step7').then(response => response.text());
+                if (step7Result !== 'success') throw new Error('Step 7 failed');
+                document.getElementById('finalImage').src = '/display/final_with_boundary.jpg?' + new Date().getTime();
+                document.getElementById('step7Status').textContent = 'Processing complete! GeoJSON boundary shown in cyan. Ready for download.';
+                document.getElementById('downloadGeoJSON').disabled = false;
+                
+                // Enable all Next Step buttons
+                document.getElementById('step2Next').disabled = false;
+                document.getElementById('step3Next').disabled = false;
+                document.getElementById('step4Next').disabled = false;
+                document.getElementById('step5Next').disabled = false;
+                document.getElementById('step6Next').disabled = false;
+                
+                
+                // Scroll to final result
+                document.getElementById('step7').scrollIntoView({ behavior: 'smooth' });
+                
+            } catch (error) {
+                console.error('Error in automatic processing:', error);
+                alert('Error during automatic processing: ' + error.message);
+            }
+        }
+
+        document.getElementById('runAllSteps').onclick = processAllSteps;
     </script>
 </body>
 </html>
