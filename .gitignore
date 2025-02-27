@@ -1,0 +1,15 @@
+# Ignore generated images
+images/
+*.jpg
+*.jpeg
+*.png
+
+# Ignore generated data files
+*.json
+
+# Python specific ignores
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+venv/ 
