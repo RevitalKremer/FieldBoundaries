@@ -2,6 +2,35 @@
 <html>
 <head>
     <title>Find Boundaries</title>
+    <script>
+        // Initialize callback for Google Maps
+        function initializeMap() {
+            // This function will be called when Google Maps is loaded
+            initMap();
+        }
+
+        // Error handler for Google Maps loading
+        function gm_authFailure() {
+            const mapContainer = document.getElementById('map');
+            mapContainer.innerHTML = `
+                <div style="padding: 20px; text-align: center; background: #f8d7da; color: #721c24; border-radius: 5px;">
+                    <h4>Google Maps API Error</h4>
+                    <p>Please configure the Google Maps API key to allow requests from: ${window.location.origin}</p>
+                    <p>Add this URL to the API key restrictions in Google Cloud Console.</p>
+                    <p><a href="https://console.cloud.google.com" target="_blank" style="color: #721c24; text-decoration: underline;">
+                        Open Google Cloud Console
+                    </a></p>
+                </div>
+            `;
+            
+            // Disable map-related buttons
+            document.getElementById('toggleSatellite').disabled = true;
+            document.getElementById('captureImage').disabled = true;
+        }
+    </script>
+    <script async defer
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBxEFce5OReQM7uMWwGXxWybicCn0WCr0E&libraries=drawing&callback=initializeMap">
+    </script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -118,9 +147,67 @@
             width: 100%;
             text-align: center;
         }
+        #map-container {
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        #map {
+            width: 100%;
+            height: 400px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+        .map-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            align-items: center;
+        }
+        .map-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .map-button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .zoom-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-left: auto;
+        }
+        .zoom-control input[type="range"] {
+            width: 100px;
+        }
+        .zoom-control span {
+            min-width: 40px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
+    <div id="map-container">
+        <h3>Select Location from Google Maps</h3>
+        <div id="map"></div>
+        <div class="map-controls">
+            <button id="toggleSatellite" class="map-button">Toggle Satellite View</button>
+            <button id="captureImage" class="map-button" disabled>Capture This Area</button>
+            <div class="zoom-control">
+                <label>Zoom:</label>
+                <input type="range" id="zoomSlider" min="1" max="21" value="13">
+                <span id="zoomLevel">13</span>
+            </div>
+        </div>
+    </div>
+
     <div class="step-row" id="step1">
         <div class="operation">
             <h3>Step 1: Upload and Mark Image</h3>
@@ -344,6 +431,149 @@
 
     <script>
         let selectedPoint = null;
+        let map;
+        let currentMapType = 'satellite';  // Changed default to satellite
+
+        // Initialize Google Map
+        function initMap() {
+            try {
+                map = new google.maps.Map(document.getElementById('map'), {
+                    center: { lat: 32.90113196474662, lng: 35.12035674668466 }, // Specific coordinates
+                    zoom: 17, // Default zoom level
+                    mapTypeId: 'satellite',
+                    mapTypeControl: false
+                });
+
+                // Update zoom slider to match default zoom
+                document.getElementById('zoomSlider').value = 17;
+                document.getElementById('zoomLevel').textContent = '17';
+
+                // Add zoom changed listener
+                map.addListener('zoom_changed', function() {
+                    const zoom = map.getZoom();
+                    document.getElementById('zoomSlider').value = zoom;
+                    document.getElementById('zoomLevel').textContent = zoom;
+                });
+
+                // Add zoom slider listener
+                document.getElementById('zoomSlider').addEventListener('input', function() {
+                    const zoom = parseInt(this.value);
+                    map.setZoom(zoom);
+                    document.getElementById('zoomLevel').textContent = zoom;
+                });
+
+                // Add error handling for no imagery
+                map.addListener('tilesloaded', function() {
+                    // Check if the map div contains the "no imagery" message
+                    const mapDiv = document.getElementById('map');
+                    if (mapDiv.innerHTML.toLowerCase().includes('sorry')) {
+                        // No imagery available at this location
+                        document.getElementById('captureImage').disabled = true;
+                        document.getElementById('uploadStatus').textContent = 'No satellite imagery available for this location. Please try a different area.';
+                    } else {
+                        // Imagery is available
+                        document.getElementById('captureImage').disabled = false;
+                        document.getElementById('uploadStatus').textContent = 'Click "Capture This Area" when ready.';
+                    }
+                });
+
+                // Update initial button text to show next state
+                document.getElementById('toggleSatellite').textContent = 'Show Road Map';
+
+                // Add map click event listener
+                map.addListener('click', function(e) {
+                    const lat = e.latLng.lat();
+                    const lng = e.latLng.lng();
+                    
+                    // Update latitude and longitude inputs
+                    document.getElementById('latitude').value = lat;
+                    document.getElementById('longitude').value = lng;
+                    
+                    // Check if imagery is available before enabling capture
+                    const mapDiv = document.getElementById('map');
+                    if (!mapDiv.innerHTML.toLowerCase().includes('sorry')) {
+                        document.getElementById('captureImage').disabled = false;
+                    }
+                });
+            } catch (error) {
+                console.error('Error initializing Google Maps:', error);
+                const mapContainer = document.getElementById('map');
+                mapContainer.innerHTML = `
+                    <div style="padding: 20px; text-align: center; background: #f8d7da; color: #721c24; border-radius: 5px;">
+                        <h4>Google Maps Error</h4>
+                        <p>Error initializing Google Maps: ${error.message}</p>
+                        <p>Please check your internet connection and try refreshing the page.</p>
+                    </div>
+                `;
+                
+                // Disable map-related buttons
+                document.getElementById('toggleSatellite').disabled = true;
+                document.getElementById('captureImage').disabled = true;
+            }
+        }
+
+        // Update map type toggle button
+        document.getElementById('toggleSatellite').onclick = function() {
+            switch(currentMapType) {
+                case 'roadmap':
+                    currentMapType = 'terrain';
+                    map.setMapTypeId('terrain');
+                    this.textContent = 'Show Satellite';
+                    break;
+                case 'terrain':
+                    currentMapType = 'satellite';
+                    map.setMapTypeId('satellite');
+                    this.textContent = 'Show Road Map';
+                    break;
+                case 'satellite':
+                    currentMapType = 'roadmap';
+                    map.setMapTypeId('roadmap');
+                    this.textContent = 'Show Terrain';
+                    break;
+            }
+        };
+
+        // Capture map area
+        document.getElementById('captureImage').onclick = function() {
+            // Get the map bounds
+            const bounds = map.getBounds();
+            const ne = bounds.getNorthEast();
+            const sw = bounds.getSouthWest();
+
+            // Get center coordinates
+            const center = map.getCenter();
+            const lat = center.lat();
+            const lng = center.lng();
+            const zoom = map.getZoom();
+
+            // Check if imagery is available
+            const mapDiv = document.getElementById('map');
+            if (mapDiv.innerHTML.toLowerCase().includes('sorry')) {
+                alert('No satellite imagery is available for this location. Please try a different area.');
+                return;
+            }
+
+            // Create URL for static map
+            const width = 640;  // Max size for Static Maps API
+            const height = 640;
+            const url = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${width}x${height}&maptype=satellite&key=AIzaSyBxEFce5OReQM7uMWwGXxWybicCn0WCr0E`;
+
+            // Create an image element and set its source
+            const img = document.getElementById('previewImage');
+            img.onload = function() {
+                // Update form values
+                document.getElementById('latitude').value = lat;
+                document.getElementById('longitude').value = lng;
+                
+                // Enable point selection
+                document.getElementById('pointMarker').style.display = 'none';
+                document.getElementById('step1Next').disabled = true;
+                document.getElementById('runAllSteps').disabled = true;
+                document.getElementById('uploadStatus').textContent = 'Click on the image to mark the field point';
+            };
+            img.src = url;
+            img.style.display = 'block';
+        };
 
         document.getElementById('imageInput').onchange = function(e) {
             const file = this.files[0];
@@ -402,6 +632,7 @@
             if (!selectedPoint) return;
             
             const formData = new FormData(document.getElementById('uploadForm'));
+            formData.append('staticMapUrl', document.getElementById('previewImage').src);
             document.getElementById('uploadStatus').textContent = 'Processing...';
             
             fetch('/process_step1_upload', {
@@ -419,6 +650,10 @@
                 } else {
                     document.getElementById('uploadStatus').textContent = 'Error: ' + result;
                 }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('uploadStatus').textContent = 'Error: ' + error.message;
             });
         };
 

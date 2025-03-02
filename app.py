@@ -17,9 +17,33 @@ app = Flask(__name__)
 if not os.path.exists('images'):
     os.makedirs('images')
 
+def download_image_from_url(url):
+    """Download image from URL and save it"""
+    try:
+        import urllib.request
+        import numpy as np
+        
+        resp = urllib.request.urlopen(url)
+        arr = np.asarray(bytearray(resp.read()), dtype=np.uint8)
+        image = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        
+        if image is not None:
+            cv2.imwrite('images/uploaded_image.jpg', image)
+            return True
+        return False
+    except Exception as e:
+        print(f"Error downloading image: {str(e)}")
+        return False
+
 def step1_process_image_with_point(image_path, point_coords):
     """Process image to draw circle around selected point"""
     try:
+        # If image_path is a URL, download it first
+        if image_path.startswith('http'):
+            if not download_image_from_url(image_path):
+                return False, "Could not download the image from URL"
+            image_path = 'images/uploaded_image.jpg'
+        
         # Read the image
         image = cv2.imread(image_path)
         if image is None:
@@ -36,10 +60,12 @@ def step1_process_image_with_point(image_path, point_coords):
         
         # Save processed image
         cv2.imwrite('images/processed_image.jpg', image)
+        
         return True, "Point marked successfully"
         
     except Exception as e:
         return False, f"Error processing image: {str(e)}"
+
 def overlay_point_on_image(image_path, point_coords, save_path=None):
     """Overlay the selected point on an image without modifying the original"""
     try:
@@ -92,18 +118,32 @@ def index():
 
 @app.route('/process_step1_upload', methods=['POST'])
 def process_step1_upload():
-    file = request.files['image']
-    point_x = int(request.form['pointX'])
-    point_y = int(request.form['pointY'])
-    
-    # Save original image
-    file.save('images/uploaded_image.jpg')
-    
-    # Process image with point
-    success, message = step1_process_image_with_point('images/uploaded_image.jpg', (point_x, point_y))
-    if success:
-        return 'success'
-    return message
+    try:
+        # Get the image data from the form
+        image_path = None
+        
+        if 'image' in request.files and request.files['image'].filename:
+            # Handle file upload
+            file = request.files['image']
+            file.save('images/uploaded_image.jpg')
+            image_path = 'images/uploaded_image.jpg'
+        elif 'staticMapUrl' in request.form and request.form['staticMapUrl']:
+            # Handle static map URL
+            image_path = request.form['staticMapUrl']
+        
+        if not image_path:
+            return 'No image data provided'
+
+        point_x = int(request.form['pointX'])
+        point_y = int(request.form['pointY'])
+        
+        # Process image with point
+        success, message = step1_process_image_with_point(image_path, (point_x, point_y))
+        if success:
+            return 'success'
+        return message
+    except Exception as e:
+        return f"Error processing upload: {str(e)}"
 
 @app.route('/processed_image')
 def processed_image():
