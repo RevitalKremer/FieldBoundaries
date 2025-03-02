@@ -15,7 +15,7 @@
             mapContainer.innerHTML = `
                 <div style="padding: 20px; text-align: center; background: #f8d7da; color: #721c24; border-radius: 5px;">
                     <h4>Google Maps API Error</h4>
-                    <p>Please configure the Google Maps API key to allow requests from: ${window.location.origin}</p>
+                    <p>Please configure the Google Maps API key to allow requests from: {{ google_maps_api_key }}</p>
                     <p>Add this URL to the API key restrictions in Google Cloud Console.</p>
                     <p><a href="https://console.cloud.google.com" target="_blank" style="color: #721c24; text-decoration: underline;">
                         Open Google Cloud Console
@@ -29,7 +29,7 @@
         }
     </script>
     <script async defer
-        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBxEFce5OReQM7uMWwGXxWybicCn0WCr0E&libraries=drawing&callback=initializeMap">
+        src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=drawing&callback=initializeMap">
     </script>
     <style>
         body {
@@ -556,7 +556,7 @@
             // Create URL for static map
             const width = 640;  // Max size for Static Maps API
             const height = 640;
-            const url = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${width}x${height}&maptype=satellite&key=AIzaSyBxEFce5OReQM7uMWwGXxWybicCn0WCr0E`;
+            const url = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${width}x${height}&maptype=satellite&key={{ google_maps_api_key }}`;
 
             // Create an image element and set its source
             const img = document.getElementById('previewImage');

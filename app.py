@@ -1,3 +1,12 @@
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    print("\nError: The 'python-dotenv' package is not installed.")
+    print("Please install it using one of these commands:")
+    print("    pip install python-dotenv")
+    print("    pip3 install python-dotenv\n")
+    raise
+
 from flask import Flask, render_template, request, send_file, jsonify
 import cv2
 import numpy as np
@@ -8,11 +17,16 @@ from steps.step4 import step4_process_image
 from steps.step5 import smooth_shape_edges
 from steps.step6 import step6_process_image
 from steps.step7 import generate_geojson
-
 import os
 from geojson import Feature, Polygon, FeatureCollection
 
+# Load environment variables
+load_dotenv()
+
 app = Flask(__name__)
+
+# Get Google Maps API key from environment
+GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
 
 if not os.path.exists('images'):
     os.makedirs('images')
@@ -111,7 +125,7 @@ def create_gray_overlay(image_path, opacity=0.5):
 @app.route('/')
 def index():
     try:
-        return render_template('findboundaries.html')
+        return render_template('findboundaries.html', google_maps_api_key=GOOGLE_MAPS_API_KEY)
     except Exception as e:
         app.logger.error(f"Error in index route: {str(e)}")
         return f"Error accessing template: {str(e)}", 500
