@@ -24,7 +24,6 @@
             `;
             
             // Disable map-related buttons
-            document.getElementById('toggleSatellite').disabled = true;
             document.getElementById('captureImage').disabled = true;
         }
     </script>
@@ -40,7 +39,7 @@
         }
         .step-row {
             display: grid;
-            grid-template-columns: 250px minmax(600px, 1fr) 150px;
+            grid-template-columns: 250px minmax(640px, 1fr) 150px;
             gap: 20px;
             align-items: start;
             margin-bottom: 20px;
@@ -62,22 +61,23 @@
         }
         .image-container {
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             min-height: 300px;
             background-color: #f9f9f9;
             border-radius: 5px;
             padding: 10px;
+            width: 100%;
         }
         .image-preview-container {
             position: relative;
             display: inline-block;
         }
         .image-container img {
-            cursor: crosshair;
             max-width: 100%;
             max-height: 600px;
-            width: auto;
+            width: 640px;
             height: auto;
             object-fit: contain;
         }
@@ -154,16 +154,19 @@
             border-radius: 5px;
         }
         #map {
-            width: 100%;
+            width: 640px;
             height: 400px;
             margin-bottom: 10px;
             border-radius: 5px;
+            margin: 0 auto;
         }
         .map-controls {
             display: flex;
-            gap: 10px;
-            margin-top: 10px;
             align-items: center;
+            gap: 10px;
+            padding: 5px 0;
+            width: 640px;
+            margin: 10px auto 0;
         }
         .map-button {
             background-color: #4CAF50;
@@ -191,24 +194,62 @@
             min-width: 40px;
             text-align: center;
         }
+        .map-container {
+            display: flex;
+            flex-direction: column;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            padding: 10px;
+            min-height: 300px;
+            width: 100%;
+        }
     </style>
 </head>
 <body>
-    <div id="map-container">
-        <h3>Select Location from Google Maps</h3>
-        <div id="map"></div>
-        <div class="map-controls">
-            <button id="toggleSatellite" class="map-button">Toggle Satellite View</button>
-            <button id="captureImage" class="map-button" disabled>Capture This Area</button>
-            <div class="zoom-control">
-                <label>Zoom:</label>
-                <input type="range" id="zoomSlider" min="1" max="21" value="13">
-                <span id="zoomLevel">13</span>
+    <div class="step-row" id="map-step">
+        <div class="operation">
+            <h3>Select Location</h3>
+            <div class="step-instructions">
+                <p><strong>Instructions:</strong></p>
+                <ol>
+                    <li>Navigate to your desired location</li>
+                    <li>Click on the map to select a point</li>
+                    <li>Adjust zoom level if needed</li>
+                    <li>Click "Capture This Area" when ready</li>
+                </ol>
+                <p><strong>Status:</strong> <span id="mapStatus">Select a point on the map</span></p>
+                <div style="margin-top: 15px;">
+                    <div style="margin-bottom: 10px;">
+                        <label for="latitude" style="display: inline-block; width: 70px;">Latitude:</label>
+                        <input type="number" id="latitude" name="latitude" 
+                               step="0.000001" placeholder="-90 to 90"
+                               style="width: 150px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;" 
+                               required>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="longitude" style="display: inline-block; width: 70px;">Longitude:</label>
+                        <input type="number" id="longitude" name="longitude" 
+                               step="0.000001" placeholder="-180 to 180"
+                               style="width: 150px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;" 
+                               required>
+                    </div>
+                </div>
             </div>
+        </div>
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="map-controls">
+                <label>Zoom:</label>
+                <input type="range" id="zoomSlider" min="1" max="21" value="17">
+                <span id="zoomLevel">17</span>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="captureImage" disabled>Capture This Area</button>
         </div>
     </div>
 
-    <div class="step-row" id="step1">
+    <div class="step-row hidden" id="step1">
         <div class="operation">
             <h3>Step 1: Upload and Mark Image</h3>
             <div class="step-instructions">
@@ -432,7 +473,7 @@
     <script>
         let selectedPoint = null;
         let map;
-        let currentMapType = 'satellite';  // Changed default to satellite
+        let currentMarker = null; // Variable to track the current marker
 
         // Initialize Google Map
         function initMap() {
@@ -478,9 +519,9 @@
                 });
 
                 // Update initial button text to show next state
-                document.getElementById('toggleSatellite').textContent = 'Show Road Map';
+                document.getElementById('captureImage').textContent = 'Capture This Area';
 
-                // Add map click event listener
+                // Add map click event listener with marker
                 map.addListener('click', function(e) {
                     const lat = e.latLng.lat();
                     const lng = e.latLng.lng();
@@ -489,11 +530,30 @@
                     document.getElementById('latitude').value = lat;
                     document.getElementById('longitude').value = lng;
                     
-                    // Check if imagery is available before enabling capture
-                    const mapDiv = document.getElementById('map');
-                    if (!mapDiv.innerHTML.toLowerCase().includes('sorry')) {
-                        document.getElementById('captureImage').disabled = false;
+                    // Remove existing marker if there is one
+                    if (currentMarker) {
+                        currentMarker.setMap(null);
                     }
+                    
+                    // Create new marker with a simple red dot icon
+                    currentMarker = new google.maps.Marker({
+                        position: e.latLng,
+                        map: map,
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            fillColor: '#FF0000',
+                            fillOpacity: 1.0,
+                            strokeColor: '#FFFFFF',
+                            strokeWeight: 2,
+                            scale: 8  // Size of the dot
+                        }
+                    });
+                    
+                    // Enable the capture button
+                    document.getElementById('captureImage').disabled = false;
+            
+            // Update status
+                    document.getElementById('mapStatus').textContent = 'Point selected. Click "Capture This Area" to continue.';
                 });
             } catch (error) {
                 console.error('Error initializing Google Maps:', error);
@@ -507,73 +567,114 @@
                 `;
                 
                 // Disable map-related buttons
-                document.getElementById('toggleSatellite').disabled = true;
                 document.getElementById('captureImage').disabled = true;
             }
         }
 
-        // Update map type toggle button
-        document.getElementById('toggleSatellite').onclick = function() {
-            switch(currentMapType) {
-                case 'roadmap':
-                    currentMapType = 'terrain';
-                    map.setMapTypeId('terrain');
-                    this.textContent = 'Show Satellite';
-                    break;
-                case 'terrain':
-                    currentMapType = 'satellite';
-                    map.setMapTypeId('satellite');
-                    this.textContent = 'Show Road Map';
-                    break;
-                case 'satellite':
-                    currentMapType = 'roadmap';
-                    map.setMapTypeId('roadmap');
-                    this.textContent = 'Show Terrain';
-                    break;
-            }
-        };
-
         // Capture map area
         document.getElementById('captureImage').onclick = function() {
-            // Get the map bounds
-            const bounds = map.getBounds();
-            const ne = bounds.getNorthEast();
-            const sw = bounds.getSouthWest();
+            // First, check if we have coordinates selected
+            const selectedLat = document.getElementById('latitude').value;
+            const selectedLng = document.getElementById('longitude').value;
 
-            // Get center coordinates
+            if (!selectedLat || !selectedLng) {
+                alert('Please select a point on the map first');
+                return;
+            }
+
+            // Get center coordinates and zoom
             const center = map.getCenter();
             const lat = center.lat();
             const lng = center.lng();
             const zoom = map.getZoom();
 
-            // Check if imagery is available
-            const mapDiv = document.getElementById('map');
-            if (mapDiv.innerHTML.toLowerCase().includes('sorry')) {
-                alert('No satellite imagery is available for this location. Please try a different area.');
-                return;
-            }
-
             // Create URL for static map
-            const width = 640;  // Max size for Static Maps API
+            const width = 640;
             const height = 640;
             const url = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${width}x${height}&maptype=satellite&key={{ google_maps_api_key }}`;
 
             // Create an image element and set its source
             const img = document.getElementById('previewImage');
+            
+            // Add console logs for debugging
+            console.log('Loading image:', url);
+            
             img.onload = function() {
-                // Update form values
-                document.getElementById('latitude').value = lat;
-                document.getElementById('longitude').value = lng;
+                console.log('Image loaded successfully');
                 
-                // Enable point selection
-                document.getElementById('pointMarker').style.display = 'none';
-                document.getElementById('step1Next').disabled = true;
-                document.getElementById('runAllSteps').disabled = true;
-                document.getElementById('uploadStatus').textContent = 'Click on the image to mark the field point';
+                // Copy coordinates to Step 1
+                const step1Lat = document.querySelector('#step1 input[name="latitude"]');
+                const step1Lng = document.querySelector('#step1 input[name="longitude"]');
+                
+                step1Lat.value = selectedLat;
+                step1Lng.value = selectedLng;
+                
+                // Calculate point position
+                const scale = this.naturalWidth / 640;
+                const centerPoint = project(parseFloat(selectedLat), parseFloat(selectedLng), zoom);
+                const imageCenter = project(lat, lng, zoom);
+                
+                const offsetX = (centerPoint.x - imageCenter.x) * 256 * Math.pow(2, zoom);
+                const offsetY = (centerPoint.y - imageCenter.y) * 256 * Math.pow(2, zoom);
+                
+                const pointX = (this.naturalWidth / 2) + (offsetX * scale);
+                const pointY = (this.naturalHeight / 2) + (offsetY * scale);
+                
+                // Update point coordinates
+                document.getElementById('pointX').value = Math.round(pointX);
+                document.getElementById('pointY').value = Math.round(pointY);
+                
+                // Update point marker
+                const marker = document.getElementById('pointMarker');
+                marker.style.left = (pointX / scale) + 'px';
+                marker.style.top = (pointY / scale) + 'px';
+                marker.style.display = 'block';
+                
+                // Show Step 1
+                const step1 = document.getElementById('step1');
+                step1.classList.remove('hidden');
+                
+                // Enable buttons
+                document.getElementById('step1Next').disabled = false;
+                document.getElementById('runAllSteps').disabled = false;
+                
+                // Update status
+                document.getElementById('uploadStatus').textContent = 'Point selected. Click "Next Step" to continue or "Run All Steps" to process automatically.';
+                
+                // Scroll to Step 1
+                step1.scrollIntoView({ behavior: 'smooth' });
+                
+                // Clear the map marker
+                if (currentMarker) {
+                    currentMarker.setMap(null);
+                    currentMarker = null;
+                }
             };
+
+            // Add error handling for image loading
+            img.onerror = function() {
+                console.error('Failed to load image');
+                alert('Failed to capture the area. Please try again.');
+            };
+
+            // Set image source and display
             img.src = url;
             img.style.display = 'block';
+            
+            console.log('Capture process initiated');
         };
+
+        // Add the Mercator projection function for coordinate conversion
+        function project(lat, lng, zoom) {
+            const siny = Math.sin((lat * Math.PI) / 180);
+            const x = ((lng + 180) / 360);
+            const y = (0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI));
+            
+            return {
+                x: x,
+                y: Math.max(0, Math.min(1, y))
+            };
+        }
 
         document.getElementById('imageInput').onchange = function(e) {
             const file = this.files[0];
@@ -629,12 +730,33 @@
         }
 
         document.getElementById('step1Next').onclick = function() {
-            if (!selectedPoint) return;
+            // Create FormData object
+            const formData = new FormData();
             
-            const formData = new FormData(document.getElementById('uploadForm'));
+            // Get point coordinates
+            const pointX = document.getElementById('pointX').value;
+            const pointY = document.getElementById('pointY').value;
+            
+            if (!pointX || !pointY) {
+                document.getElementById('uploadStatus').textContent = 'Error: Point coordinates not found';
+                return;
+            }
+            
+            // Add the static map URL
             formData.append('staticMapUrl', document.getElementById('previewImage').src);
+            
+            // Add the point coordinates as integers
+            formData.append('pointX', Math.round(parseFloat(pointX)));
+            formData.append('pointY', Math.round(parseFloat(pointY)));
+            
+            // Add latitude and longitude
+            formData.append('latitude', document.querySelector('#step1 input[name="latitude"]').value);
+            formData.append('longitude', document.querySelector('#step1 input[name="longitude"]').value);
+            
+            // Update status
             document.getElementById('uploadStatus').textContent = 'Processing...';
             
+            // Send request to server
             fetch('/process_step1_upload', {
                 method: 'POST',
                 body: formData
@@ -642,10 +764,18 @@
             .then(response => response.text())
             .then(result => {
                 if (result === 'success') {
+                    // Update status and show next step
                     document.getElementById('uploadStatus').textContent = 'Processing complete!';
                     document.getElementById('step2').classList.remove('hidden');
-                    updateStepImages(document.getElementById('processedImage'), 'processed_image.jpg');
+                    
+                    // Update the processed image with cache-busting
+                    const timestamp = new Date().getTime();
+                    document.getElementById('processedImage').src = '/processed_image?' + timestamp;
+                    
+                    // Enable next step button
                     document.getElementById('step2Next').disabled = false;
+                    
+                    // Scroll to step 2
                     document.getElementById('step2').scrollIntoView({ behavior: 'smooth' });
                 } else {
                     document.getElementById('uploadStatus').textContent = 'Error: ' + result;
@@ -852,18 +982,29 @@
         };
 
         async function processAllSteps() {
-            // Step 1
-            const formData = new FormData(document.getElementById('uploadForm'));
-            document.getElementById('uploadStatus').textContent = 'Processing step 1...';
-            
             try {
+                // Step 1: Create form data with all necessary fields
+                const formData = new FormData();
+                
+                // Add the static map URL and coordinates
+                formData.append('staticMapUrl', document.getElementById('previewImage').src);
+                formData.append('pointX', document.getElementById('pointX').value);
+                formData.append('pointY', document.getElementById('pointY').value);
+                formData.append('latitude', document.querySelector('#step1 input[name="latitude"]').value);
+                formData.append('longitude', document.querySelector('#step1 input[name="longitude"]').value);
+
                 // Process Step 1
+                document.getElementById('uploadStatus').textContent = 'Processing step 1...';
                 const step1Result = await fetch('/process_step1_upload', {
                     method: 'POST',
                     body: formData
                 }).then(response => response.text());
                 
-                if (step1Result !== 'success') throw new Error('Step 1 failed');
+                if (step1Result !== 'success') {
+                    throw new Error('Step 1 failed: ' + step1Result);
+                }
+                
+                // Show step 2 and update image
                 document.getElementById('step2').classList.remove('hidden');
                 updateStepImages(document.getElementById('processedImage'), 'processed_image.jpg');
                 document.getElementById('step2Status').textContent = 'Processing...';
@@ -923,7 +1064,6 @@
                 document.getElementById('step4Next').disabled = false;
                 document.getElementById('step5Next').disabled = false;
                 document.getElementById('step6Next').disabled = false;
-                
                 
                 // Scroll to final result
                 document.getElementById('step7').scrollIntoView({ behavior: 'smooth' });

@@ -67,10 +67,15 @@ def step1_process_image_with_point(image_path, point_coords):
         
         # Save circle data for step 2
         with open('circle_data.json', 'w') as f:
-            json.dump({'cX': cX, 'cY': cY}, f)
+            json.dump({
+                'cX': int(cX),
+                'cY': int(cY),
+                'radius': 40  # Fixed radius for the circle
+            }, f)
         
         # Draw red circle around selected point
-        cv2.circle(image, (cX, cY), 40, (0, 0, 255), 2)
+        cv2.circle(image, (int(cX), int(cY)), 40, (0, 0, 255), 2)  # Draw circle
+        cv2.circle(image, (int(cX), int(cY)), 5, (0, 0, 255), -1)  # Draw center point
         
         # Save processed image
         cv2.imwrite('images/processed_image.jpg', image)
