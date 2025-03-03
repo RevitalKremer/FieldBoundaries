@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Find Boundaries</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/findboundaries.css') }}">
     <script>
         // Initialize callback for Google Maps
         function initializeMap() {
@@ -13,11 +14,11 @@
         function gm_authFailure() {
             const mapContainer = document.getElementById('map');
             mapContainer.innerHTML = `
-                <div style="padding: 20px; text-align: center; background: #f8d7da; color: #721c24; border-radius: 5px;">
+                <div class="error-container">
                     <h4>Google Maps API Error</h4>
                     <p>Please configure the Google Maps API key to allow requests from: {{ google_maps_api_key }}</p>
                     <p>Add this URL to the API key restrictions in Google Cloud Console.</p>
-                    <p><a href="https://console.cloud.google.com" target="_blank" style="color: #721c24; text-decoration: underline;">
+                    <p><a href="https://console.cloud.google.com" target="_blank">
                         Open Google Cloud Console
                     </a></p>
                 </div>
@@ -219,18 +220,18 @@
                 </ol>
                 <p><strong>Status:</strong> <span id="mapStatus">Select a point on the map</span></p>
                 <div style="margin-top: 15px;">
-                    <div style="margin-bottom: 10px;">
-                        <label for="latitude" style="display: inline-block; width: 70px;">Latitude:</label>
+                    <div class="coordinate-container">
+                        <label for="latitude" class="coordinate-label">Latitude:</label>
                         <input type="number" id="latitude" name="latitude" 
                                step="0.000001" placeholder="-90 to 90"
-                               style="width: 150px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;" 
+                               class="coordinate-input" 
                                required>
                     </div>
-                    <div style="margin-bottom: 10px;">
-                        <label for="longitude" style="display: inline-block; width: 70px;">Longitude:</label>
+                    <div class="coordinate-container">
+                        <label for="longitude" class="coordinate-label">Longitude:</label>
                         <input type="number" id="longitude" name="longitude" 
                                step="0.000001" placeholder="-180 to 180"
-                               style="width: 150px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;" 
+                               class="coordinate-input" 
                                required>
                     </div>
                 </div>
@@ -266,18 +267,18 @@
                 <input type="hidden" name="pointX" id="pointX">
                 <input type="hidden" name="pointY" id="pointY">
                 <div style="margin-top: 15px;">
-                    <div style="margin-bottom: 10px;">
-                        <label for="latitude" style="display: inline-block; width: 70px;">Latitude:</label>
+                    <div class="coordinate-container">
+                        <label for="latitude" class="coordinate-label">Latitude:</label>
                         <input type="number" id="latitude" name="latitude" 
                                step="0.000001" placeholder="-90 to 90"
-                               style="width: 150px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;" 
+                               class="coordinate-input" 
                                required>
                     </div>
-                    <div style="margin-bottom: 10px;">
-                        <label for="longitude" style="display: inline-block; width: 70px;">Longitude:</label>
+                    <div class="coordinate-container">
+                        <label for="longitude" class="coordinate-label">Longitude:</label>
                         <input type="number" id="longitude" name="longitude" 
                                step="0.000001" placeholder="-180 to 180"
-                               style="width: 150px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;" 
+                               class="coordinate-input" 
                                required>
                     </div>
                 </div>
@@ -361,12 +362,13 @@
                     <li>Red: Other detected areas</li>
                 </ul>
                 <p><strong>Window Size:</strong> 
-                    <input type="range" id="windowSize" min="1" max="20" value="1" style="width: 100px;">
-                    <span id="windowSizeValue">1px</span>
-                    <button class="next-button" id="applyWindowSize" 
-                            style="width: auto; padding: 5px 10px; margin-left: 10px;">
-                        Apply
-                    </button>
+                    <div class="range-control">
+                        <input type="range" id="windowSize" min="1" max="20" value="1">
+                        <span id="windowSizeValue" class="range-value">1px</span>
+                        <button class="next-button control-button" id="applyWindowSize">
+                            Apply
+                        </button>
+                    </div>
                 </p>
                 <p><strong>Status:</strong> <span id="step4Status">Waiting to process...</span></p>
             </div>
@@ -394,14 +396,14 @@
                     <li>Create natural field boundaries</li>
                 </ul>
                 <p><strong>Smoothing Factor:</strong> 
-                    <input type="range" id="epsilonFactor" 
-                           min="0.0001" max="0.01" value="0.01" step="0.0001" 
-                           style="width: 100px;">
-                    <span id="epsilonValue">0.0100</span>
-                    <button class="next-button" id="applySmoothing" 
-                            style="width: auto; padding: 5px 10px; margin-left: 10px;">
-                        Apply
-                    </button>
+                    <div class="range-control">
+                        <input type="range" id="epsilonFactor" 
+                               min="0.0001" max="0.01" value="0.01" step="0.0001">
+                        <span id="epsilonValue" class="range-value">0.0100</span>
+                        <button class="next-button control-button" id="applySmoothing">
+                            Apply
+                        </button>
+                    </div>
                 </p>
                 <p><strong>Status:</strong> <span id="step5Status">Waiting to process...</span></p>
             </div>
@@ -757,7 +759,7 @@
             document.getElementById('uploadStatus').textContent = 'Processing...';
             
             // Send request to server
-            fetch('/process_step1_upload', {
+            fetch('/process_step1', {
                 method: 'POST',
                 body: formData
             })
@@ -995,7 +997,7 @@
 
                 // Process Step 1
                 document.getElementById('uploadStatus').textContent = 'Processing step 1...';
-                const step1Result = await fetch('/process_step1_upload', {
+                const step1Result = await fetch('/process_step1', {
                     method: 'POST',
                     body: formData
                 }).then(response => response.text());
