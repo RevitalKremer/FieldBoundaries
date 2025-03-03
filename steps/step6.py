@@ -2,6 +2,15 @@ import cv2
 import numpy as np
 import json
 
+
+def process_step6():
+    # Use smoothed shape from step 4.1 instead of main shape
+    success, message = step6_process_image('images/uploaded_image.jpg', 'images/smoothed_shape.jpg')
+    if success:
+        return 'success'
+    return message
+
+
 def step6_process_image(original_image_path, smoothed_shape_path):
     """Create masked original image showing only the field area and mark the selected point"""
     try:

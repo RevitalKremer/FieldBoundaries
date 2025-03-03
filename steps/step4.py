@@ -1,5 +1,21 @@
+import json
 import cv2
 import numpy as np
+
+def process_step4():
+    # Get original point coordinates
+    with open('circle_data.json', 'r') as f:
+        circle_data = json.load(f)
+    
+    success, message = step4_process_image(
+        'images/density_mask.jpg',
+        (circle_data['cX'], circle_data['cY'])
+    )
+    
+    if success:
+        return 'success'
+    return message
+
 
 def step4_process_image(mask_path, point_coords):
     """Fill connected white area containing the point with magenta"""

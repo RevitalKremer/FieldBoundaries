@@ -1,5 +1,20 @@
+from flask import request
 import cv2
 import numpy as np
+import json
+
+def process_step3():
+    # Get window size from request
+    window_size = int(request.form.get('windowSize', 5))
+    success, message = step3_process_image('images/green_mask.jpg', window_size=window_size)
+    
+    if success:
+        # Save window size for step 6
+        with open('window_size.json', 'w') as f:
+            json.dump({'size': window_size}, f)
+        return 'success'
+    return message
+
 
 def step3_process_image(mask_path, window_size=10, threshold=0.6):
     """Create density-based mask using sliding window"""

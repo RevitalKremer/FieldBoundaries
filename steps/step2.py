@@ -1,5 +1,21 @@
+import json
 import cv2
 import numpy as np
+
+def process_step2():
+    # Get circle center and radius from step 1
+    with open('circle_data.json', 'r') as f:
+        circle_data = json.load(f)
+    
+    success, message = step2_process_image(
+        'images/uploaded_image.jpg',
+        (circle_data['cX'], circle_data['cY']),
+        40  # radius from step 1
+    )
+    
+    if success:
+        return 'success'
+    return message
 
 def get_reference_green(image_path, circle_center, circle_radius):
     """Get the green color reference from inside the red circle"""

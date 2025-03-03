@@ -1,6 +1,15 @@
+from flask import request
 import cv2
 import numpy as np
 import json
+
+def process_step5():
+    epsilon_factor = float(request.form.get('epsilonFactor', 0.001))
+    success, message = smooth_shape_edges('images/main_shape.jpg', epsilon_factor)
+    if success:
+        return 'success'
+    return message
+
 
 def smooth_shape_edges(image_path, epsilon_factor=0.001):
     """Convert magenta shape to smooth polygon"""
