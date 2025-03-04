@@ -69,7 +69,7 @@ def step2_process_image(image_path, circle_center, circle_radius):
         green_mask = cv2.inRange(hsv, lower_green, upper_green)
         
         # Save the mask
-        cv2.imwrite('images/green_mask.jpg', green_mask)
+        cv2.imwrite('images/step3_green_mask.jpg', green_mask)
         return True, "Green areas mask created successfully"
         
     except Exception as e:

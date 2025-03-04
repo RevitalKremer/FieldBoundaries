@@ -49,7 +49,7 @@ def step1_process_image_with_point(image_path, point_coords):
         cv2.circle(image, (int(cX), int(cY)), 5, (0, 0, 255), -1)  # Draw center point
         
         # Save processed image
-        cv2.imwrite('images/processed_image.jpg', image)
+        cv2.imwrite('images/step2_processed_image.jpg', image)
         
         return True, "Point marked successfully"
         

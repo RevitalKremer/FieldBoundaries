@@ -4,7 +4,7 @@ from geojson import Feature, Polygon, FeatureCollection
 
 def process_step7():
     """Generate GeoJSON from the smoothed shape and draw it on the final image"""
-    success, message = generate_geojson('images/smoothed_shape.jpg')
+    success, message = generate_geojson('images/step5_smoothed_shape.jpg')
     if success:
         if draw_geojson_on_image():
             return 'success'
@@ -14,7 +14,7 @@ def draw_geojson_on_image():
     """Draw the GeoJSON boundary on the original image"""
     try:
         # Read the masked field image to get the contours
-        masked_image = cv2.imread('images/masked_field.jpg')
+        masked_image = cv2.imread('images/step6_masked_field.jpg')
         # Read the original image to draw on
         original_image = cv2.imread('images/uploaded_image.jpg')
         if masked_image is None or original_image is None:
@@ -59,7 +59,7 @@ def draw_geojson_on_image():
                 json.dump(geojson_data, f)
         
         # Save the original image with boundary
-        cv2.imwrite('images/final_with_boundary.jpg', original_image)
+        cv2.imwrite('images/step7_final_with_boundary.jpg', original_image)
         return True
     except Exception as e:
         print(f"Error drawing GeoJSON: {str(e)}")

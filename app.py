@@ -96,7 +96,7 @@ def process_step(step_id):
 
 @app.route('/processed_image')
 def processed_image():
-    return send_file('images/processed_image.jpg', mimetype='image/jpeg')
+    return send_file('images/step2_processed_image.jpg', mimetype='image/jpeg')
 
 @app.route('/image/<image_name>')
 def get_image(image_name):

@@ -6,7 +6,7 @@ import json
 def process_step3():
     # Get window size from request
     window_size = int(request.form.get('windowSize', 5))
-    success, message = step3_process_image('images/green_mask.jpg', window_size=window_size)
+    success, message = step3_process_image('images/step3_green_mask.jpg', window_size=window_size)
     
     if success:
         # Save window size for step 6
