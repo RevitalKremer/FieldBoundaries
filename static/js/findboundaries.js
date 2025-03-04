@@ -65,12 +65,20 @@ function project(lat, lng, zoom) {
  * Handles image updates with cache busting and optional overlay
  */
 function updateStepImages(resultImgElement, imagePath, useOverlay = false) {
-    resultImgElement.src = '/display/' + imagePath + '?' + new Date().getTime();
+    // Add cache-busting timestamp
+    const timestamp = new Date().getTime();
+    
+    // Keep the original path structure (/display/ or direct path)
+    if (imagePath.startsWith('/display/')) {
+        resultImgElement.src = imagePath + '?' + timestamp;
+    } else {
+        resultImgElement.src = '/display/' + imagePath + '?' + timestamp;
+    }
     
     if (useOverlay) {
         const container = resultImgElement.parentElement.parentElement;
         const overlayImg = container.querySelector('img:first-of-type');
-        overlayImg.src = '/gray_overlay?' + new Date().getTime();
+        overlayImg.src = '/gray_overlay?' + timestamp;
     }
 }
 
@@ -538,7 +546,7 @@ async function processStep5() {
         }).then(response => response.text());
         if (result !== 'success') throw new Error('Step 5 failed');
         
-        document.getElementById('smoothedShapeImage').src = '/display/step5_smoothed_shape.jpg?' + new Date().getTime();
+        updateStepImages(document.getElementById('smoothedShapeImage'), 'step5_smoothed_shape.jpg');
         document.getElementById('step5Status').textContent = 'Processing complete!';
         document.getElementById('step5Next').disabled = false;
         moveToNextStep('step5');
@@ -580,7 +588,7 @@ async function processStep7() {
         const result = await fetch('/process_step7').then(response => response.text());
         if (result !== 'success') throw new Error('Step 7 failed');
         
-        document.getElementById('finalImage').src = '/display/step7_final_with_boundary.jpg?' + new Date().getTime();
+        updateStepImages(document.getElementById('finalImage'), 'step7_final_with_boundary.jpg');
         document.getElementById('step7Status').textContent = 'Processing complete! GeoJSON boundary shown in cyan. Ready for download.';
         document.getElementById('downloadGeoJSON').disabled = false;
         moveToNextStep('step7');
