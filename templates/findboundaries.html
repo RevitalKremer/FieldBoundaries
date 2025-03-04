@@ -277,15 +277,16 @@
 
     <div class="step-row hidden" id="step3">
         <div class="operation">
-            <h3>Step 3: Black Mask (Pixel Density)</h3>
+            <h3>Step 3: Adaptive Green Areas Mask</h3>
             <div class="step-instructions">
-                <p><strong>Goal:</strong> Create field shape mask using pixel density analysis.</p>
+                <p><strong>Goal:</strong> Create a mask to isolate the green areas representing the field.</p>
                 <p><strong>Process:</strong></p>
                 <ul>
-                    <li>Analyzing pixel windows</li>
-                    <li>Calculating green pixel density in each window</li>
-                    <li>White regions: High density of field pixels</li>
-                    <li>Black regions: Low density or non-field areas</li>
+                    <li>Analyzing the red circle surrounding region</li>
+                    <li>Determining the green field's specific pattern</li>
+                    <li>Creating mask based on identified green pattern</li>
+                    <li>White pixels: Areas matching field pattern</li>
+                    <li>Black pixels: Non-matching areas</li>
                 </ul>
                 <p><strong>Status:</strong> <span id="step3Status">Waiting to process...</span></p>
             </div>
@@ -923,3 +924,4 @@
     </script>
 </body>
 </html>
+
