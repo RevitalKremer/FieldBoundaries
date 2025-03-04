@@ -25,556 +25,30 @@
             `;
             
             // Disable map-related buttons
-            document.getElementById('captureImage').disabled = true;
+            document.getElementById('stepMapNext').disabled = true;
         }
     </script>
     <script async defer
         src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=drawing&callback=initializeMap">
     </script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            max-width: 1200px;
-            margin: 20px auto;
-        }
-        .step-row {
-            display: grid;
-            grid-template-columns: 250px minmax(640px, 1fr) 150px;
-            gap: 20px;
-            align-items: start;
-            margin-bottom: 20px;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            min-height: 300px;
-        }
-        .operation {
-            text-align: left;
-            padding: 20px;
-            background-color: #f5f5f5;
-            border-radius: 5px;
-            height: 100%;
-        }
-        .operation h3 {
-            margin-top: 0;
-            color: #333;
-        }
-        .image-container {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            min-height: 300px;
-            background-color: #f9f9f9;
-            border-radius: 5px;
-            padding: 10px;
-            width: 100%;
-        }
-        .image-preview-container {
-            position: relative;
-            display: inline-block;
-        }
-        .image-container img {
-            max-width: 100%;
-            max-height: 600px;
-            width: 640px;
-            height: auto;
-            object-fit: contain;
-        }
-        .image-label {
-            font-size: 12px;
-            color: #666;
-            margin-top: 5px;
-        }
-        .button-container {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .next-button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            width: 100%;
-            font-size: 14px;
-        }
-        .next-button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
-        .hidden {
-            display: none;
-        }
-        #uploadForm {
-            margin-top: 15px;
-        }
-        #uploadForm input[type="file"] {
-            width: 100%;
-            padding: 8px;
-            background-color: white;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        .step-instructions {
-            margin-top: 15px;
-            font-size: 14px;
-        }
-        .step-instructions ul {
-            margin: 10px 0;
-            padding-left: 20px;
-        }
-        .step-instructions li {
-            margin: 5px 0;
-        }
-        .operation strong {
-            color: #2196F3;
-        }
-        .point-marker {
-            position: absolute;
-            width: 10px;
-            height: 10px;
-            max-width: 10px;
-            max-height: 10px;
-            background-color: red;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-        }
-        .image-container div {
-            width: 100%;
-            text-align: center;
-        }
-        #map-container {
-            margin-bottom: 20px;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        #map {
-            width: 640px;
-            height: 400px;
-            margin-bottom: 10px;
-            border-radius: 5px;
-            margin: 0 auto;
-        }
-        .map-controls {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 5px 0;
-            width: 640px;
-            margin: 10px auto 0;
-        }
-        .map-button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        .map-button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
-        .zoom-control {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-left: auto;
-        }
-        .zoom-control input[type="range"] {
-            width: 100px;
-        }
-        .zoom-control span {
-            min-width: 40px;
-            text-align: center;
-        }
-        .map-container {
-            display: flex;
-            flex-direction: column;
-            background-color: #f9f9f9;
-            border-radius: 5px;
-            padding: 10px;
-            min-height: 300px;
-            width: 100%;
-        }
-    </style>
-</head>
-<body>
-    <div class="step-row" id="map-step">
-        <div class="operation">
-            <h3>Select Location</h3>
-            <div class="step-instructions">
-                <p><strong>Instructions:</strong></p>
-                <ol>
-                    <li>Navigate to your desired location</li>
-                    <li>Click on the map to select a point</li>
-                    <li>Adjust zoom level if needed</li>
-                    <li>Click "Capture This Area" when ready</li>
-                </ol>
-                <p><strong>Status:</strong> <span id="mapStatus">Select a point on the map</span></p>
-                <div style="margin-top: 15px;">
-                    <div class="coordinate-container">
-                        <label for="latitude" class="coordinate-label">Latitude:</label>
-                        <input type="number" id="latitude" name="latitude" 
-                               step="0.000001" placeholder="-90 to 90"
-                               class="coordinate-input" 
-                               required>
-                    </div>
-                    <div class="coordinate-container">
-                        <label for="longitude" class="coordinate-label">Longitude:</label>
-                        <input type="number" id="longitude" name="longitude" 
-                               step="0.000001" placeholder="-180 to 180"
-                               class="coordinate-input" 
-                               required>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="map-container">
-            <div id="map"></div>
-            <div class="map-controls">
-                <label>Zoom:</label>
-                <input type="range" id="zoomSlider" min="1" max="21" value="17">
-                <span id="zoomLevel">17</span>
-            </div>
-        </div>
-        <div class="button-container">
-            <button class="next-button" id="captureImage" disabled>Capture This Area</button>
-        </div>
-    </div>
-
-    <div class="step-row hidden" id="step1">
-        <div class="operation">
-            <h3>Step 1: Upload and Mark Image</h3>
-            <div class="step-instructions">
-                <p><strong>Instructions:</strong></p>
-                <ol>
-                    <li>Select a satellite image file</li>
-                    <li>Click on the image to mark a point inside the field</li>
-                    <li>Click "Next Step" to continue</li>
-                </ol>
-                <p><strong>Status:</strong> <span id="uploadStatus">Select an image to begin</span></p>
-            </div>
-            <form id="uploadForm">
-                <input type="file" name="image" accept="image/*" id="imageInput">
-                <input type="hidden" name="pointX" id="pointX">
-                <input type="hidden" name="pointY" id="pointY">
-                <div style="margin-top: 15px;">
-                    <div class="coordinate-container">
-                        <label for="latitude" class="coordinate-label">Latitude:</label>
-                        <input type="number" id="latitude" name="latitude" 
-                               step="0.000001" placeholder="-90 to 90"
-                               class="coordinate-input" 
-                               required>
-                    </div>
-                    <div class="coordinate-container">
-                        <label for="longitude" class="coordinate-label">Longitude:</label>
-                        <input type="number" id="longitude" name="longitude" 
-                               step="0.000001" placeholder="-180 to 180"
-                               class="coordinate-input" 
-                               required>
-                    </div>
-                </div>
-            </form>
-        </div>
-        <div class="image-container">
-            <div class="image-preview-container">
-                <img id="previewImage" style="display: none;" alt="Selected Image">
-                <div class="point-marker" id="pointMarker" style="display: none;"></div>
-            </div>
-        </div>
-        <div class="button-container">
-            <button class="next-button" id="step1Next" disabled>Next Step</button>
-            <button class="next-button" id="runAllSteps" disabled >Run All Steps</button>
-        </div>
-    </div>
-
-    <div class="step-row hidden" id="step2">
-        <div class="operation">
-            <h3>Step 2: Green Areas Mask</h3>
-            <div class="step-instructions">
-                <p><strong>Goal:</strong> Create a mask highlighting areas with similar green color as the field.</p>
-                <p><strong>Process:</strong></p>
-                <ul>
-                    <li>Analyzing green color within the red circle</li>
-                    <li>Excluding the yellow dot from analysis</li>
-                    <li>Creating mask based on similar green areas</li>
-                    <li>White pixels: Similar to field's green</li>
-                    <li>Black pixels: Different colors</li>
-                </ul>
-                <p><strong>Status:</strong> <span id="step2Status">Waiting to process...</span></p>
-            </div>
-        </div>
-        <div class="image-container">
-            <div>
-                <img id="processedImage" src="" alt="Original with Circle">
-                <div class="image-label">Original with Circle</div>
-            </div>
-        </div>
-        <div class="button-container">
-            <button class="next-button" id="step2Next" disabled>Next Step</button>
-        </div>
-    </div>
-
-    <div class="step-row hidden" id="step3">
-        <div class="operation">
-            <h3>Step 3: Black Mask (Pixel Density)</h3>
-            <div class="step-instructions">
-                <p><strong>Goal:</strong> Create field shape mask using pixel density analysis.</p>
-                <p><strong>Process:</strong></p>
-                <ul>
-                    <li>Analyzing pixel windows</li>
-                    <li>Calculating green pixel density in each window</li>
-                    <li>White regions: High density of field pixels</li>
-                    <li>Black regions: Low density or non-field areas</li>
-                </ul>
-                <p><strong>Status:</strong> <span id="step3Status">Waiting to process...</span></p>
-            </div>
-        </div>
-        <div class="image-container">
-            <div>
-                <img id="greenMaskImage" src="" alt="Green Mask">
-                <div class="image-label">Green Mask</div>
-            </div>
-        </div>
-        <div class="button-container">
-            <button class="next-button" id="step3Next" disabled>Next Step</button>
-        </div>
-    </div>
-
-    <div class="step-row hidden" id="step4">
-        <div class="operation">
-            <h3>Step 4: Main Shape Identification</h3>
-            <div class="step-instructions">
-                <p><strong>Goal:</strong> Identify the main field shape containing the selected point.</p>
-                <p><strong>Process:</strong></p>
-                <ul>
-                    <li>Detecting all shapes in the density mask</li>
-                    <li>Finding shape containing original point</li>
-                    <li>Cyan: Main field shape</li>
-                    <li>Red: Other detected areas</li>
-                </ul>
-                <p><strong>Window Size:</strong> 
-                    <div class="range-control">
-                        <input type="range" id="windowSize" min="1" max="20" value="1">
-                        <span id="windowSizeValue" class="range-value">1px</span>
-                        <button class="next-button control-button" id="applyWindowSize">
-                            Apply
-                        </button>
-                    </div>
-                </p>
-                <p><strong>Status:</strong> <span id="step4Status">Waiting to process...</span></p>
-            </div>
-        </div>
-        <div class="image-container">
-            <div>
-                <img id="mainShapeImage" src="" alt="Main Shape">
-                <div class="image-label">Main Shape</div>
-            </div>
-        </div>
-        <div class="button-container">
-            <button class="next-button" id="step4Next" disabled>Next Step</button>
-        </div>
-    </div>
-
-    <div class="step-row hidden" id="step5">
-        <div class="operation">
-            <h3>Step 5: Edge Smoothing</h3>
-            <div class="step-instructions">
-                <p><strong>Goal:</strong> Smooth the edges of the field shape.</p>
-                <p><strong>Process:</strong></p>
-                <ul>
-                    <li>Apply morphological operations</li>
-                    <li>Remove jagged edges</li>
-                    <li>Create natural field boundaries</li>
-                </ul>
-                <p><strong>Smoothing Factor:</strong> 
-                    <div class="range-control">
-                        <input type="range" id="epsilonFactor" 
-                               min="0.0001" max="0.01" value="0.01" step="0.0001">
-                        <span id="epsilonValue" class="range-value">0.0100</span>
-                        <button class="next-button control-button" id="applySmoothing">
-                            Apply
-                        </button>
-                    </div>
-                </p>
-                <p><strong>Status:</strong> <span id="step5Status">Waiting to process...</span></p>
-            </div>
-        </div>
-        <div class="image-container">
-            <div>
-                <img id="smoothedShapeImage" src="" alt="Smoothed Shape">
-                <div class="image-label">Smoothed Shape</div>
-            </div>
-        </div>
-        <div class="button-container">
-            <button class="next-button" id="step5Next" disabled>Next Step</button>
-        </div>
-    </div>
-
-    <div class="step-row hidden" id="step6">
-        <div class="operation">
-            <h3>Step 6: Field Area Isolation</h3>
-            <div class="step-instructions">
-                <p><strong>Goal:</strong> Isolate the identified field area in the original image.</p>
-                <p><strong>Process:</strong></p>
-                <ul>
-                    <li>Creating mask from magenta area</li>
-                    <li>Applying mask to original image</li>
-                    <li>Setting non-field areas to white</li>
-                    <li>Preserving original colors in field area</li>
-                </ul>
-                <p><strong>Status:</strong> <span id="step6Status">Waiting to process...</span></p>
-            </div>
-        </div>
-        <div class="image-container">
-            
-            <div>
-                <img id="maskedFieldImage" src="" alt="Masked Field">
-                <div class="image-label">Masked Field</div>
-            </div>
-        </div>
-        <div class="button-container">
-            <button class="next-button" id="step6Next" disabled>Next Step</button>
-        </div>
-    </div>
-
-    <div class="step-row hidden" id="step7">
-        <div class="operation">
-            <h3>Step 7: GeoJSON Generation</h3>
-            <div class="step-instructions">
-                <p><strong>Goal:</strong> Generate GeoJSON file from the field boundary.</p>
-                <p><strong>Process:</strong></p>
-                <ul>
-                    <li>Converting field boundary to coordinates</li>
-                    <li>Creating GeoJSON polygon</li>
-                    <li>Generating downloadable file</li>
-                </ul>
-                <p><strong>Status:</strong> <span id="step7Status">Waiting to process...</span></p>
-            </div>
-        </div>
-        <div class="image-container">
-            <div>
-                <img id="finalImage" src="" alt="Final Result">
-                <div class="image-label">Final Result</div>
-            </div>
-        </div>
-        <div class="button-container">
-            <button class="next-button" id="downloadGeoJSON" disabled>Download GeoJSON</button>
-        </div>
-    </div>
-
-
     <script>
-        let selectedPoint = null;
-        let map;
-        let currentMarker = null; // Variable to track the current marker
+        // Set the Google Maps API key for use in findboundaries.js
+        const googleMapsApiKey = "{{ google_maps_api_key }}";
 
-        // Initialize Google Map
-        function initMap() {
-            try {
-                map = new google.maps.Map(document.getElementById('map'), {
-                    center: { lat: 32.90113196474662, lng: 35.12035674668466 }, // Specific coordinates
-                    zoom: 17, // Default zoom level
-                    mapTypeId: 'satellite',
-                    mapTypeControl: false
-                });
-
-                // Update zoom slider to match default zoom
-                document.getElementById('zoomSlider').value = 17;
-                document.getElementById('zoomLevel').textContent = '17';
-
-                // Add zoom changed listener
-                map.addListener('zoom_changed', function() {
-                    const zoom = map.getZoom();
-                    document.getElementById('zoomSlider').value = zoom;
-                    document.getElementById('zoomLevel').textContent = zoom;
-                });
-
-                // Add zoom slider listener
-                document.getElementById('zoomSlider').addEventListener('input', function() {
-                    const zoom = parseInt(this.value);
-                    map.setZoom(zoom);
-                    document.getElementById('zoomLevel').textContent = zoom;
-                });
-
-                // Add error handling for no imagery
-                map.addListener('tilesloaded', function() {
-                    // Check if the map div contains the "no imagery" message
-                    const mapDiv = document.getElementById('map');
-                    if (mapDiv.innerHTML.toLowerCase().includes('sorry')) {
-                        // No imagery available at this location
-                        document.getElementById('captureImage').disabled = true;
-                        document.getElementById('uploadStatus').textContent = 'No satellite imagery available for this location. Please try a different area.';
-                    } else {
-                        // Imagery is available
-                        document.getElementById('captureImage').disabled = false;
-                        document.getElementById('uploadStatus').textContent = 'Click "Capture This Area" when ready.';
-                    }
-                });
-
-                // Update initial button text to show next state
-                document.getElementById('captureImage').textContent = 'Capture This Area';
-
-                // Add map click event listener with marker
-                map.addListener('click', function(e) {
-                    const lat = e.latLng.lat();
-                    const lng = e.latLng.lng();
-                    
-                    // Update latitude and longitude inputs
-                    document.getElementById('latitude').value = lat;
-                    document.getElementById('longitude').value = lng;
-                    
-                    // Remove existing marker if there is one
-                    if (currentMarker) {
-                        currentMarker.setMap(null);
-                    }
-                    
-                    // Create new marker with a simple red dot icon
-                    currentMarker = new google.maps.Marker({
-                        position: e.latLng,
-                        map: map,
-                        icon: {
-                            path: google.maps.SymbolPath.CIRCLE,
-                            fillColor: '#FF0000',
-                            fillOpacity: 1.0,
-                            strokeColor: '#FFFFFF',
-                            strokeWeight: 2,
-                            scale: 8  // Size of the dot
-                        }
-                    });
-                    
-                    // Enable the capture button
-                    document.getElementById('captureImage').disabled = false;
+        // Mercator projection function for coordinate conversion
+        function project(lat, lng, zoom) {
+            const siny = Math.sin((lat * Math.PI) / 180);
+            const x = ((lng + 180) / 360);
+            const y = (0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI));
             
-            // Update status
-                    document.getElementById('mapStatus').textContent = 'Point selected. Click "Capture This Area" to continue.';
-                });
-            } catch (error) {
-                console.error('Error initializing Google Maps:', error);
-                const mapContainer = document.getElementById('map');
-                mapContainer.innerHTML = `
-                    <div style="padding: 20px; text-align: center; background: #f8d7da; color: #721c24; border-radius: 5px;">
-                        <h4>Google Maps Error</h4>
-                        <p>Error initializing Google Maps: ${error.message}</p>
-                        <p>Please check your internet connection and try refreshing the page.</p>
-                    </div>
-                `;
-                
-                // Disable map-related buttons
-                document.getElementById('captureImage').disabled = true;
-            }
+            return {
+                x: x,
+                y: Math.max(0, Math.min(1, y))
+            };
         }
 
         // Capture map area
-        document.getElementById('captureImage').onclick = function() {
+        function processStep0() {
             // First, check if we have coordinates selected
             const selectedLat = document.getElementById('latitude').value;
             const selectedLng = document.getElementById('longitude').value;
@@ -593,7 +67,7 @@
             // Create URL for static map
             const width = 640;
             const height = 640;
-            const url = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${width}x${height}&maptype=satellite&key={{ google_maps_api_key }}`;
+            const url = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${width}x${height}&maptype=satellite&key=${googleMapsApiKey}`;
 
             // Create an image element and set its source
             const img = document.getElementById('previewImage');
@@ -664,18 +138,376 @@
             img.style.display = 'block';
             
             console.log('Capture process initiated');
-        };
+        }
+    </script>
+    <script src="{{ url_for('static', filename='js/findboundaries.js', v=timestamp) }}"></script>
 
-        // Add the Mercator projection function for coordinate conversion
-        function project(lat, lng, zoom) {
-            const siny = Math.sin((lat * Math.PI) / 180);
-            const x = ((lng + 180) / 360);
-            const y = (0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI));
+</head>
+<body>
+    <div class="step-row" id="step0">
+        <div class="operation">
+            <h3>Select Location</h3>
+            <div class="step-instructions">
+                <p><strong>Instructions:</strong></p>
+                <ol>
+                    <li>Navigate to your desired location</li>
+                    <li>Click on the map to select a point</li>
+                    <li>Adjust zoom level if needed</li>
+                    <li>Click "Capture This Area" when ready</li>
+                </ol>
+                <p><strong>Status:</strong> <span id="mapStatus">Select a point on the map</span></p>
+                <div style="margin-top: 15px;">
+                    <div class="coordinate-container">
+                        <label for="latitude" class="coordinate-label">Latitude:</label>
+                        <input type="number" id="latitude" name="latitude" 
+                               step="0.000001" placeholder="-90 to 90"
+                               class="coordinate-input" 
+                               required>
+                    </div>
+                    <div class="coordinate-container">
+                        <label for="longitude" class="coordinate-label">Longitude:</label>
+                        <input type="number" id="longitude" name="longitude" 
+                               step="0.000001" placeholder="-180 to 180"
+                               class="coordinate-input" 
+                               required>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="map-controls">
+                <label>Zoom:</label>
+                <input type="range" id="zoomSlider" min="1" max="21" value="17">
+                <span id="zoomLevel">17</span>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="step0Next" onclick="processStep0()" disabled>Capture This Area</button>
+        </div>
+    </div>
+
+    <div class="step-row hidden" id="step1">
+        <div class="operation">
+            <h3>Step 1: Upload and Mark Image</h3>
+            <div class="step-instructions">
+                <p><strong>Instructions:</strong></p>
+                <ol>
+                    <li>Select a satellite image file</li>
+                    <li>Click on the image to mark a point inside the field</li>
+                    <li>Click "Next Step" to continue</li>
+                </ol>
+                <p><strong>Status:</strong> <span id="uploadStatus">Select an image to begin</span></p>
+            </div>
+            <form id="uploadForm">
+                <input type="file" name="image" accept="image/*" id="imageInput">
+                <input type="hidden" name="pointX" id="pointX">
+                <input type="hidden" name="pointY" id="pointY">
+                <div style="margin-top: 15px;">
+                    <div class="coordinate-container">
+                        <label for="latitude" class="coordinate-label">Latitude:</label>
+                        <input type="number" id="latitude" name="latitude" 
+                               step="0.000001" placeholder="-90 to 90"
+                               class="coordinate-input" 
+                               required>
+                    </div>
+                    <div class="coordinate-container">
+                        <label for="longitude" class="coordinate-label">Longitude:</label>
+                        <input type="number" id="longitude" name="longitude" 
+                               step="0.000001" placeholder="-180 to 180"
+                               class="coordinate-input" 
+                               required>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="image-container">
+            <div class="image-preview-container">
+                <img id="previewImage" style="display: none;" alt="Selected Image">
+                <div class="point-marker" id="pointMarker" style="display: none;"></div>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="step1Next" onclick="processStep(1)" disabled>Next Step</button>
+            <button class="next-button" id="runAllSteps" onclick="processAllSteps()" disabled >Run All Steps</button>
+        </div>
+    </div>
+
+    <div class="step-row hidden" id="step2">
+        <div class="operation">
+            <h3>Step 2: Green Areas Mask</h3>
+            <div class="step-instructions">
+                <p><strong>Goal:</strong> Create a mask highlighting areas with similar green color as the field.</p>
+                <p><strong>Process:</strong></p>
+                <ul>
+                    <li>Analyzing green color within the red circle</li>
+                    <li>Excluding the yellow dot from analysis</li>
+                    <li>Creating mask based on similar green areas</li>
+                    <li>White pixels: Similar to field's green</li>
+                    <li>Black pixels: Different colors</li>
+                </ul>
+                <p><strong>Status:</strong> <span id="step2Status">Waiting to process...</span></p>
+            </div>
+        </div>
+        <div class="image-container">
+            <div>
+                <img id="processedImage" src="" alt="Original with Circle">
+                <div class="image-label">Original with Circle</div>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="step2Next" onclick="processStep2()" disabled>Next Step</button>
+        </div>
+    </div>
+
+    <div class="step-row hidden" id="step3">
+        <div class="operation">
+            <h3>Step 3: Black Mask (Pixel Density)</h3>
+            <div class="step-instructions">
+                <p><strong>Goal:</strong> Create field shape mask using pixel density analysis.</p>
+                <p><strong>Process:</strong></p>
+                <ul>
+                    <li>Analyzing pixel windows</li>
+                    <li>Calculating green pixel density in each window</li>
+                    <li>White regions: High density of field pixels</li>
+                    <li>Black regions: Low density or non-field areas</li>
+                </ul>
+                <p><strong>Status:</strong> <span id="step3Status">Waiting to process...</span></p>
+            </div>
+        </div>
+        <div class="image-container">
+            <div>
+                <img id="greenMaskImage" src="" alt="Green Mask">
+                <div class="image-label">Green Mask</div>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="step3Next" onclick="processStep3And4()" disabled>Next Step</button>
+        </div>
+    </div>
+
+    <div class="step-row hidden" id="step4">
+        <div class="operation">
+            <h3>Step 4: Main Shape Identification</h3>
+            <div class="step-instructions">
+                <p><strong>Goal:</strong> Identify the main field shape containing the selected point.</p>
+                <p><strong>Process:</strong></p>
+                <ul>
+                    <li>Detecting all shapes in the density mask</li>
+                    <li>Finding shape containing original point</li>
+                    <li>Cyan: Main field shape</li>
+                    <li>Red: Other detected areas</li>
+                </ul>
+                <p><strong>Window Size:</strong> 
+                    <div class="range-control">
+                        <input type="range" id="windowSize" min="1" max="20" value="1">
+                        <span id="windowSizeValue" class="range-value">1px</span>
+                        <button class="next-button control-button" id="applyWindowSize">
+                            Apply
+                        </button>
+                    </div>
+                </p>
+                <p><strong>Status:</strong> <span id="step4Status">Waiting to process...</span></p>
+            </div>
+        </div>
+        <div class="image-container">
+            <div>
+                <img id="mainShapeImage" src="" alt="Main Shape">
+                <div class="image-label">Main Shape</div>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="step4Next" onclick="processStep5()" disabled>Next Step</button>
+        </div>
+    </div>
+
+    <div class="step-row hidden" id="step5">
+        <div class="operation">
+            <h3>Step 5: Edge Smoothing</h3>
+            <div class="step-instructions">
+                <p><strong>Goal:</strong> Smooth the edges of the field shape.</p>
+                <p><strong>Process:</strong></p>
+                <ul>
+                    <li>Apply morphological operations</li>
+                    <li>Remove jagged edges</li>
+                    <li>Create natural field boundaries</li>
+                </ul>
+                <p><strong>Smoothing Factor:</strong> 
+                    <div class="range-control">
+                        <input type="range" id="epsilonFactor" 
+                               min="0.0001" max="0.01" value="0.01" step="0.0001">
+                        <span id="epsilonValue" class="range-value">0.0100</span>
+                        <button class="next-button control-button" id="applySmoothing">
+                            Apply
+                        </button>
+                    </div>
+                </p>
+                <p><strong>Status:</strong> <span id="step5Status">Waiting to process...</span></p>
+            </div>
+        </div>
+        <div class="image-container">
+            <div>
+                <img id="smoothedShapeImage" src="" alt="Smoothed Shape">
+                <div class="image-label">Smoothed Shape</div>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="step5Next" onclick="processStep6()" disabled>Next Step</button>
+        </div>
+    </div>
+
+    <div class="step-row hidden" id="step6">
+        <div class="operation">
+            <h3>Step 6: Field Area Isolation</h3>
+            <div class="step-instructions">
+                <p><strong>Goal:</strong> Isolate the identified field area in the original image.</p>
+                <p><strong>Process:</strong></p>
+                <ul>
+                    <li>Creating mask from magenta area</li>
+                    <li>Applying mask to original image</li>
+                    <li>Setting non-field areas to white</li>
+                    <li>Preserving original colors in field area</li>
+                </ul>
+                <p><strong>Status:</strong> <span id="step6Status">Waiting to process...</span></p>
+            </div>
+        </div>
+        <div class="image-container">
             
-            return {
-                x: x,
-                y: Math.max(0, Math.min(1, y))
-            };
+            <div>
+                <img id="maskedFieldImage" src="" alt="Masked Field">
+                <div class="image-label">Masked Field</div>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="step6Next" onclick="processStep7()" disabled>Next Step</button>
+        </div>
+    </div>
+
+    <div class="step-row hidden" id="step7">
+        <div class="operation">
+            <h3>Step 7: GeoJSON Generation</h3>
+            <div class="step-instructions">
+                <p><strong>Goal:</strong> Generate GeoJSON file from the field boundary.</p>
+                <p><strong>Process:</strong></p>
+                <ul>
+                    <li>Converting field boundary to coordinates</li>
+                    <li>Creating GeoJSON polygon</li>
+                    <li>Generating downloadable file</li>
+                </ul>
+                <p><strong>Status:</strong> <span id="step7Status">Waiting to process...</span></p>
+            </div>
+        </div>
+        <div class="image-container">
+            <div>
+                <img id="finalImage" src="" alt="Final Result">
+                <div class="image-label">Final Result</div>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="downloadGeoJSON" onclick="window.location.href = '/download_geojson'" disabled>Download GeoJSON</button>
+        </div>
+    </div>
+
+
+    <script>
+        let selectedPoint = null;
+        let map;
+        let currentMarker = null; // Variable to track the current marker
+
+        // Initialize Google Map
+        function initMap() {
+            try {
+                map = new google.maps.Map(document.getElementById('map'), {
+                    center: { lat: 32.90113196474662, lng: 35.12035674668466 }, // Specific coordinates
+                    zoom: 17, // Default zoom level
+                    mapTypeId: 'satellite',
+                    mapTypeControl: false
+                });
+
+                // Update zoom slider to match default zoom
+                document.getElementById('zoomSlider').value = 17;
+                document.getElementById('zoomLevel').textContent = '17';
+
+                // Add zoom changed listener
+                map.addListener('zoom_changed', function() {
+                    const zoom = map.getZoom();
+                    document.getElementById('zoomSlider').value = zoom;
+                    document.getElementById('zoomLevel').textContent = zoom;
+                });
+
+                // Add zoom slider listener
+                document.getElementById('zoomSlider').addEventListener('input', function() {
+                    const zoom = parseInt(this.value);
+                    map.setZoom(zoom);
+                    document.getElementById('zoomLevel').textContent = zoom;
+                });
+
+                // Add error handling for no imagery
+                map.addListener('tilesloaded', function() {
+                    // Check if the map div contains the "no imagery" message
+                    const mapDiv = document.getElementById('map');
+                    if (mapDiv.innerHTML.toLowerCase().includes('sorry')) {
+                        // No imagery available at this location
+                        document.getElementById('stepMapNext').disabled = true;
+                        document.getElementById('uploadStatus').textContent = 'No satellite imagery available for this location. Please try a different area.';
+                    } else {
+                        // Imagery is available
+                        document.getElementById('stepMapNext').disabled = false;
+                        document.getElementById('uploadStatus').textContent = 'Click "Capture This Area" when ready.';
+                    }
+                });
+
+                // Update initial button text to show next state
+                document.getElementById('stepMapNext').textContent = 'Capture This Area';
+
+                // Add map click event listener with marker
+                map.addListener('click', function(e) {
+                    const lat = e.latLng.lat();
+                    const lng = e.latLng.lng();
+                    
+                    // Update latitude and longitude inputs
+                    document.getElementById('latitude').value = lat;
+                    document.getElementById('longitude').value = lng;
+                    
+                    // Remove existing marker if there is one
+                    if (currentMarker) {
+                        currentMarker.setMap(null);
+                    }
+                    
+                    // Create new marker with a simple red dot icon
+                    currentMarker = new google.maps.Marker({
+                        position: e.latLng,
+                        map: map,
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            fillColor: '#FF0000',
+                            fillOpacity: 1.0,
+                            strokeColor: '#FFFFFF',
+                            strokeWeight: 2,
+                            scale: 8  // Size of the dot
+                        }
+                    });
+                    
+                    // Enable the capture button
+                    document.getElementById('stepMapNext').disabled = false;
+            
+            // Update status
+                    document.getElementById('mapStatus').textContent = 'Point selected. Click "Capture This Area" to continue.';
+                });
+            } catch (error) {
+                console.error('Error initializing Google Maps:', error);
+                const mapContainer = document.getElementById('map');
+                mapContainer.innerHTML = `
+                    <div style="padding: 20px; text-align: center; background: #f8d7da; color: #721c24; border-radius: 5px;">
+                        <h4>Google Maps Error</h4>
+                        <p>Error initializing Google Maps: ${error.message}</p>
+                        <p>Please check your internet connection and try refreshing the page.</p>
+                    </div>
+                `;
+                
+                // Disable map-related buttons
+                document.getElementById('stepMapNext').disabled = true;
+            }
         }
 
         document.getElementById('imageInput').onchange = function(e) {
@@ -977,10 +809,6 @@
                         document.getElementById('step7Status').textContent = 'Error: ' + result;
                     }
                 });
-        };
-
-        document.getElementById('downloadGeoJSON').onclick = function() {
-            window.location.href = '/download_geojson';
         };
 
         async function processAllSteps() {

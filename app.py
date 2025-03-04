@@ -20,6 +20,7 @@ from steps.step6 import process_step6
 from steps.step7 import process_step7
 import os
 from geojson import Feature, Polygon, FeatureCollection
+import time
 
 # Load environment variables
 load_dotenv()
@@ -32,6 +33,9 @@ GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
 if not os.path.exists('images'):
     os.makedirs('images')
 
+def get_timestamp():
+    """Generate a timestamp for cache busting"""
+    return int(time.time())
 
 def overlay_point_on_image(image_path, point_coords, save_path=None):
     """Overlay the selected point on an image without modifying the original"""
@@ -78,7 +82,9 @@ def create_gray_overlay(image_path, opacity=0.5):
 @app.route('/')
 def index():
     try:
-        return render_template('findboundaries.html', google_maps_api_key=GOOGLE_MAPS_API_KEY)
+        return render_template('findboundaries.html', 
+                             google_maps_api_key=GOOGLE_MAPS_API_KEY,
+                             timestamp=get_timestamp())
     except Exception as e:
         app.logger.error(f"Error in index route: {str(e)}")
         return f"Error accessing template: {str(e)}", 500
