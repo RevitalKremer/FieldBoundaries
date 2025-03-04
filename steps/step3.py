@@ -1,50 +1,78 @@
-from flask import request
+
+import json
 import cv2
 import numpy as np
-import json
 
 def process_step3():
-    # Get window size from request
-    window_size = int(request.form.get('windowSize', 5))
-    success, message = step3_process_image('images/step3_green_mask.jpg', window_size=window_size)
+    # Get circle center and radius from step 1
+    with open('circle_data.json', 'r') as f:
+        circle_data = json.load(f)
+    
+    success, message = step2_process_image(
+        'images/uploaded_image.jpg',
+        (circle_data['cX'], circle_data['cY']),
+        40  # radius from step 1
+    )
     
     if success:
-        # Save window size for step 6
-        with open('window_size.json', 'w') as f:
-            json.dump({'size': window_size}, f)
         return 'success'
     return message
 
+def get_reference_green(image_path, circle_center, circle_radius):
+    """Get the green color reference from inside the red circle"""
+    image = cv2.imread(image_path)
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    
+    # Create a mask for the circle area
+    circle_mask = np.zeros(image.shape[:2], dtype=np.uint8)
+    cv2.circle(circle_mask, circle_center, circle_radius, 255, -1)
+    
+    # Create a mask for the yellow dot to exclude it
+    lower_yellow = np.array([20, 100, 100])
+    upper_yellow = np.array([30, 255, 255])
+    yellow_mask = cv2.inRange(hsv, lower_yellow, upper_yellow)
+    
+    # Final mask: circle area minus yellow dot
+    reference_area = cv2.bitwise_and(circle_mask, cv2.bitwise_not(yellow_mask))
+    
+    # Get the average HSV values in the reference area
+    mean_hsv = cv2.mean(hsv, mask=reference_area)[:3]
+    return mean_hsv
 
-def step3_process_image(mask_path, window_size=10, threshold=0.6):
-    """Create density-based mask using sliding window"""
+def step2_process_image(image_path, circle_center, circle_radius):
+    """Create mask for green areas based on reference color"""
     try:
-        # Read the green mask
-        mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-        if mask is None:
-            return False, "Could not read the mask image"
-
-        # Create output mask
-        height, width = mask.shape
-        density_mask = np.zeros_like(mask)
-
-        # Slide window across the image
-        for y in range(0, height - window_size + 1, window_size):
-            for x in range(0, width - window_size + 1, window_size):
-                # Get window
-                window = mask[y:y + window_size, x:x + window_size]
-                
-                # Calculate density of white pixels
-                white_pixels = np.count_nonzero(window)
-                density = white_pixels / (window_size * window_size)
-                
-                # If density exceeds threshold, mark this region as white
-                if density > threshold:
-                    density_mask[y:y + window_size, x:x + window_size] = 255
-
-        # Save the density mask
-        cv2.imwrite('images/density_mask.jpg', density_mask)
-        return True, "Density mask created successfully"
+        # Get reference green color
+        ref_hsv = get_reference_green(image_path, circle_center, circle_radius)
+        
+        # Read the image and convert to HSV
+        image = cv2.imread(image_path)
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        
+        # Define green color range based on reference (with tolerance)
+        h_tolerance = 10
+        s_tolerance = 50
+        v_tolerance = 50
+        
+        lower_green = np.array([
+            max(0, ref_hsv[0] - h_tolerance),
+            max(0, ref_hsv[1] - s_tolerance),
+            max(0, ref_hsv[2] - v_tolerance)
+        ])
+        
+        upper_green = np.array([
+            min(180, ref_hsv[0] + h_tolerance),
+            min(255, ref_hsv[1] + s_tolerance),
+            min(255, ref_hsv[2] + v_tolerance)
+        ])
+        
+        # Create the green mask
+        green_mask = cv2.inRange(hsv, lower_green, upper_green)
+        
+        # Save the mask
+        cv2.imwrite('images/step3_green_mask.jpg', green_mask)
+        return True, "Green areas mask created successfully"
         
     except Exception as e:
-        return False, f"Error creating density mask: {str(e)}" 
+        return False, f"Error creating green mask: {str(e)}" 
+

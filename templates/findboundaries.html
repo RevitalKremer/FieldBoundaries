@@ -606,7 +606,7 @@
             document.getElementById('uploadStatus').textContent = 'Processing...';
             
             // Send request to server
-            fetch('/process_step1', {
+            fetch('/process_step2', {
                 method: 'POST',
                 body: formData
             })
@@ -640,7 +640,7 @@
             document.getElementById('step3').classList.remove('hidden');
             document.getElementById('step3Status').textContent = 'Processing...';
             
-            fetch('/process_step2')
+            fetch('/process_step3')
                 .then(response => response.text())
                 .then(result => {
                     if (result === 'success') {
@@ -663,7 +663,7 @@
             const formData = new FormData();
             formData.append('windowSize', '1');
             
-            fetch('/process_step3', {
+            fetch('/process_step100', {
                 method: 'POST',
                 body: formData
             })
@@ -700,7 +700,7 @@
             const formData = new FormData();
             formData.append('windowSize', windowSize);
             
-            fetch('/process_step3', {
+            fetch('/process_step100', {
                 method: 'POST',
                 body: formData
             })
@@ -840,7 +840,7 @@
 
                 // Process Step 1
                 document.getElementById('uploadStatus').textContent = 'Processing step 1...';
-                const step1Result = await fetch('/process_step1', {
+                const step1Result = await fetch('/process_step2', {
                     method: 'POST',
                     body: formData
                 }).then(response => response.text());
@@ -855,7 +855,7 @@
                 document.getElementById('step2Status').textContent = 'Processing...';
                 
                 // Process Step 2
-                const step2Result = await fetch('/process_step2').then(response => response.text());
+                const step2Result = await fetch('/process_step3').then(response => response.text());
                 if (step2Result !== 'success') throw new Error('Step 2 failed');
                 document.getElementById('step3').classList.remove('hidden');
                 updateStepImages(document.getElementById('greenMaskImage'), 'step3_green_mask.jpg');
@@ -864,7 +864,7 @@
                 // Process Step 3 & 4
                 const formData3 = new FormData();
                 formData3.append('windowSize', '1');
-                const step3Result = await fetch('/process_step3', {
+                const step3Result = await fetch('/process_step100', {
                     method: 'POST',
                     body: formData3
                 }).then(response => response.text());

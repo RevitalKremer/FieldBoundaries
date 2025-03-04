@@ -452,14 +452,21 @@ function checkStep1Completion() {
 async function processStep1() {
     try {
         const formData = new FormData();
-        formData.append('staticMapUrl', document.getElementById('previewImage').src);
+        const previewImage = document.getElementById('previewImage');
+        
+        // Convert the preview image to a blob
+        const response = await fetch(previewImage.src);
+        const blob = await response.blob();
+        formData.append('image', blob, 'preview_image.jpg');
+        
+        // Add other necessary data
         formData.append('pointX', document.getElementById('pointX').value);
         formData.append('pointY', document.getElementById('pointY').value);
         formData.append('latitude', document.getElementById('step1-latitude').value);
         formData.append('longitude', document.getElementById('step1-longitude').value);
 
         document.getElementById('uploadStatus').textContent = 'Processing step 1...';
-        const result = await fetch('/process_step1', {
+        const result = await fetch('/process_step2', {
             method: 'POST',
             body: formData
         }).then(response => response.text());
@@ -486,7 +493,7 @@ async function processStep1() {
  */
 async function processStep2() {
     try {
-        const result = await fetch('/process_step2').then(response => response.text());
+        const result = await fetch('/process_step3').then(response => response.text());
         if (result !== 'success') throw new Error('Step 2 failed');
         
         updateStepImages(document.getElementById('greenMaskImage'), 'step3_green_mask.jpg');
@@ -510,7 +517,7 @@ async function processStep3And4() {
         const formData = new FormData();
         formData.append('windowSize', '1');
         
-        const step3Result = await fetch('/process_step3', {
+        const step3Result = await fetch('/process_step100', {
             method: 'POST',
             body: formData
         }).then(response => response.text());
@@ -717,7 +724,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = new FormData();
             formData.append('windowSize', windowSize);
             
-            const step3Result = await fetch('/process_step3', {
+            const step3Result = await fetch('/process_step100', {
                 method: 'POST',
                 body: formData
             }).then(response => response.text());

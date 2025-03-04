@@ -1,76 +1,86 @@
-import json
+from flask import request
 import cv2
 import numpy as np
+import json
+import urllib.request
 
-def process_step2():
-    # Get circle center and radius from step 1
-    with open('circle_data.json', 'r') as f:
-        circle_data = json.load(f)
-    
-    success, message = step2_process_image(
-        'images/uploaded_image.jpg',
-        (circle_data['cX'], circle_data['cY']),
-        40  # radius from step 1
-    )
-    
-    if success:
-        return 'success'
-    return message
-
-def get_reference_green(image_path, circle_center, circle_radius):
-    """Get the green color reference from inside the red circle"""
-    image = cv2.imread(image_path)
-    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    
-    # Create a mask for the circle area
-    circle_mask = np.zeros(image.shape[:2], dtype=np.uint8)
-    cv2.circle(circle_mask, circle_center, circle_radius, 255, -1)
-    
-    # Create a mask for the yellow dot to exclude it
-    lower_yellow = np.array([20, 100, 100])
-    upper_yellow = np.array([30, 255, 255])
-    yellow_mask = cv2.inRange(hsv, lower_yellow, upper_yellow)
-    
-    # Final mask: circle area minus yellow dot
-    reference_area = cv2.bitwise_and(circle_mask, cv2.bitwise_not(yellow_mask))
-    
-    # Get the average HSV values in the reference area
-    mean_hsv = cv2.mean(hsv, mask=reference_area)[:3]
-    return mean_hsv
-
-def step2_process_image(image_path, circle_center, circle_radius):
-    """Create mask for green areas based on reference color"""
+def download_image_from_url(url):
+    """Download image from URL and save it"""
     try:
-        # Get reference green color
-        ref_hsv = get_reference_green(image_path, circle_center, circle_radius)
+        resp = urllib.request.urlopen(url)
+        arr = np.asarray(bytearray(resp.read()), dtype=np.uint8)
+        image = cv2.imdecode(arr, cv2.IMREAD_COLOR)
         
-        # Read the image and convert to HSV
+        if image is not None:
+            cv2.imwrite('images/uploaded_image.jpg', image)
+            return True
+        return False
+    except Exception as e:
+        print(f"Error downloading image: {str(e)}")
+        return False
+
+
+def step1_process_image_with_point(image_path, point_coords):
+    """Process image to draw circle around selected point"""
+    try:
+        # If image_path is a URL, download it first
+        if image_path.startswith('http'):
+            if not download_image_from_url(image_path):
+                return False, "Could not download the image from URL"
+            image_path = 'images/uploaded_image.jpg'
+        
+        # Read the image
         image = cv2.imread(image_path)
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        if image is None:
+            return False, "Could not read the image"
         
-        # Define green color range based on reference (with tolerance)
-        h_tolerance = 10
-        s_tolerance = 50
-        v_tolerance = 50
+        cX, cY = point_coords
         
-        lower_green = np.array([
-            max(0, ref_hsv[0] - h_tolerance),
-            max(0, ref_hsv[1] - s_tolerance),
-            max(0, ref_hsv[2] - v_tolerance)
-        ])
+        # Save circle data for step 2
+        with open('circle_data.json', 'w') as f:
+            json.dump({
+                'cX': int(cX),
+                'cY': int(cY),
+                'radius': 40  # Fixed radius for the circle
+            }, f)
         
-        upper_green = np.array([
-            min(180, ref_hsv[0] + h_tolerance),
-            min(255, ref_hsv[1] + s_tolerance),
-            min(255, ref_hsv[2] + v_tolerance)
-        ])
+        # Draw red circle around selected point
+        cv2.circle(image, (int(cX), int(cY)), 40, (0, 0, 255), 2)  # Draw circle
+        cv2.circle(image, (int(cX), int(cY)), 5, (0, 0, 255), -1)  # Draw center point
         
-        # Create the green mask
-        green_mask = cv2.inRange(hsv, lower_green, upper_green)
+        # Save processed image
+        cv2.imwrite('images/step2_processed_image.jpg', image)
         
-        # Save the mask
-        cv2.imwrite('images/step3_green_mask.jpg', green_mask)
-        return True, "Green areas mask created successfully"
+        return True, "Point marked successfully"
         
     except Exception as e:
-        return False, f"Error creating green mask: {str(e)}" 
+        return False, f"Error processing image: {str(e)}"
+
+def process_step2():
+    try:
+        # Get the image data from the form
+        image_path = None
+        
+        if 'image' in request.files and request.files['image'].filename:
+            # Handle file upload
+            file = request.files['image']
+            file.save('images/uploaded_image.jpg')
+            image_path = 'images/uploaded_image.jpg'
+        elif 'staticMapUrl' in request.form and request.form['staticMapUrl']:
+            # Handle static map URL
+            image_path = request.form['staticMapUrl']
+        
+        if not image_path:
+            return 'No image data provided'
+
+        point_x = int(request.form['pointX'])
+        point_y = int(request.form['pointY'])
+        
+        # Process image with point
+        success, message = step1_process_image_with_point(image_path, (point_x, point_y))
+        if success:
+            return 'success'
+        return message
+    except Exception as e:
+        return f"Error processing upload: {str(e)}"
+

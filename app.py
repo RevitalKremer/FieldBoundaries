@@ -11,9 +11,9 @@ from flask import Flask, render_template, request, send_file, jsonify, url_for
 import cv2
 import numpy as np
 import json
-from steps.step1 import process_step1
 from steps.step2 import process_step2
 from steps.step3 import process_step3
+from steps.step4 import process_step100
 from steps.step4 import process_step4
 from steps.step5 import process_step5    
 from steps.step6 import process_step6
