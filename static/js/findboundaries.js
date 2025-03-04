@@ -446,10 +446,10 @@ function checkStep1Completion() {
 }
 
 /**
- * Step 1: Processes the initial image and point selection
+ * Step 2: Processes the initial image and point selection
  * Sends selected coordinates and image to server for processing
  */
-async function processStep1() {
+async function processStep2() {
     try {
         const formData = new FormData();
         const previewImage = document.getElementById('previewImage');
@@ -465,7 +465,7 @@ async function processStep1() {
         formData.append('latitude', document.getElementById('step1-latitude').value);
         formData.append('longitude', document.getElementById('step1-longitude').value);
 
-        document.getElementById('uploadStatus').textContent = 'Processing step 1...';
+        document.getElementById('uploadStatus').textContent = 'Processing step 2...';
         const result = await fetch('/process_step2', {
             method: 'POST',
             body: formData
@@ -485,16 +485,16 @@ async function processStep1() {
     }
 }
 
-// ============= STEP 2 FUNCTIONS =============
+// ============= STEP 3 FUNCTIONS =============
 
 /**
- * Step 2: Creates green areas mask
+ * Step 3: Creates green areas mask
  * Processes image to identify areas with similar green color
  */
-async function processStep2() {
+async function processStep3() {
     try {
         const result = await fetch('/process_step3').then(response => response.text());
-        if (result !== 'success') throw new Error('Step 2 failed');
+        if (result !== 'success') throw new Error('Step 3 failed');
         
         updateStepImages(document.getElementById('greenMaskImage'), 'step3_green_mask.jpg');
         document.getElementById('step3Status').textContent = 'Processing complete!';
@@ -506,22 +506,22 @@ async function processStep2() {
     }
 }
 
-// ============= STEPS 3 & 4 FUNCTIONS =============
+// ============= STEPS 100 & 4 FUNCTIONS =============
 
 /**
- * Steps 3 & 4: Processes pixel density and identifies main shape
+ * Steps 100 & 4: Processes pixel density and identifies main shape
  * Creates black mask and identifies the main field shape
  */
-async function processStep3And4() {
+async function processStep100And4() {
     try {
         const formData = new FormData();
         formData.append('windowSize', '1');
         
-        const step3Result = await fetch('/process_step100', {
+        const step100Result = await fetch('/process_step100', {
             method: 'POST',
             body: formData
         }).then(response => response.text());
-        if (step3Result !== 'success') throw new Error('Step 3 failed');
+        if (step100Result !== 'success') throw new Error('Step 100 failed');
         
         const step4Result = await fetch('/process_step4').then(response => response.text());
         if (step4Result !== 'success') throw new Error('Step 4 failed');
@@ -531,7 +531,7 @@ async function processStep3And4() {
         document.getElementById('step4Next').disabled = false;
         moveToNextStep('step4');
     } catch (error) {
-        showErrorPopup('Steps 3 & 4', error);
+        showErrorPopup('Steps 100 & 4', error);
         document.getElementById('step3Status').textContent = 'Error: ' + error.message;
     }
 }
@@ -613,9 +613,9 @@ async function processStep7() {
  */
 async function processAllSteps() {
     try {
-        await processStep1();
         await processStep2();
-        await processStep3And4();
+        await processStep3();
+        await processStep100And4();
         await processStep5();
         await processStep6();
         await processStep7();
@@ -636,22 +636,22 @@ async function processAllSteps() {
 async function processStep(stepNumber) {
     try {
         switch(stepNumber) {
-            case 1:
-                await processStep1();
-                break;
             case 2:
                 await processStep2();
                 break;
             case 3:
-                await processStep3And4();
+                await processStep3();
                 break;
             case 4:
-                await processStep5();
+                await processStep100And4();
                 break;
             case 5:
-                await processStep6();
+                await processStep5();
                 break;
             case 6:
+                await processStep6();
+                break;
+            case 7:
                 await processStep7();
                 break;
             default:
