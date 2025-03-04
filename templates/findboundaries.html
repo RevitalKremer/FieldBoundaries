@@ -93,8 +93,8 @@
                 const offsetX = (centerPoint.x - imageCenter.x) * 256 * Math.pow(2, zoom);
                 const offsetY = (centerPoint.y - imageCenter.y) * 256 * Math.pow(2, zoom);
                 
-                const pointX = (this.naturalWidth / 2) + (offsetX * scale);
-                const pointY = (this.naturalHeight / 2) + (offsetY * scale);
+                const pointX = (width / 2) + offsetX;
+                const pointY = (height / 2) + offsetY;
                 
                 // Update point coordinates
                 document.getElementById('pointX').value = Math.round(pointX);
@@ -102,8 +102,8 @@
                 
                 // Update point marker
                 const marker = document.getElementById('pointMarker');
-                marker.style.left = (pointX / scale) + 'px';
-                marker.style.top = (pointY / scale) + 'px';
+                marker.style.left = pointX + 'px';
+                marker.style.top = pointY + 'px';
                 marker.style.display = 'block';
                 
                 // Show Step 1
@@ -192,28 +192,45 @@
             <h3>Step 1: Upload and Mark Image</h3>
             <div class="step-instructions">
                 <p><strong>Instructions:</strong></p>
-                <ol>
-                    <li>Select a satellite image file</li>
-                    <li>Click on the image to mark a point inside the field</li>
-                    <li>Click "Next Step" to continue</li>
-                </ol>
+                <div class="captured-image-section">
+                    <h4>Captured Image Path</h4>
+                    <p>If you captured an area from the map:</p>
+                    <ol>
+                        <li>The coordinates will be automatically filled</li>
+                        <li>The point marker will be placed automatically</li>
+                        <li>Click "Next Step" to continue</li>
+                    </ol>
+                </div>
+                <div class="separator"></div>
+                <div class="upload-section">
+                    <h4>Upload Image Path</h4>
+                    <p>If you're uploading your own image:</p>
+                    <ol>
+                        <li>Select a satellite image file</li>
+                        <li>Click on the image to mark a point inside the field</li>
+                        <li>Enter the latitude and longitude of the marked point</li>
+                        <li>Click "Next Step" to continue</li>
+                    </ol>
+                </div>
                 <p><strong>Status:</strong> <span id="uploadStatus">Select an image to begin</span></p>
             </div>
             <form id="uploadForm">
-                <input type="file" name="image" accept="image/*" id="imageInput">
+                <div class="file-input-container">
+                    <input type="file" name="image" accept="image/*" id="imageInput">
+                </div>
                 <input type="hidden" name="pointX" id="pointX">
                 <input type="hidden" name="pointY" id="pointY">
-                <div style="margin-top: 15px;">
+                <div class="coordinates-section">
                     <div class="coordinate-container">
-                        <label for="latitude" class="coordinate-label">Latitude:</label>
-                        <input type="number" id="latitude" name="latitude" 
+                        <label for="step1-latitude" class="coordinate-label">Latitude:</label>
+                        <input type="number" id="step1-latitude" name="latitude" 
                                step="0.000001" placeholder="-90 to 90"
                                class="coordinate-input" 
                                required>
                     </div>
                     <div class="coordinate-container">
-                        <label for="longitude" class="coordinate-label">Longitude:</label>
-                        <input type="number" id="longitude" name="longitude" 
+                        <label for="step1-longitude" class="coordinate-label">Longitude:</label>
+                        <input type="number" id="step1-longitude" name="longitude" 
                                step="0.000001" placeholder="-180 to 180"
                                class="coordinate-input" 
                                required>
@@ -221,15 +238,13 @@
                 </div>
             </form>
         </div>
-        <div class="image-container">
-            <div class="image-preview-container">
-                <img id="previewImage" style="display: none;" alt="Selected Image">
-                <div class="point-marker" id="pointMarker" style="display: none;"></div>
-            </div>
+        <div class="image-preview-container">
+            <img id="previewImage" src="" alt="Preview">
+            <div id="pointMarker" class="point-marker"></div>
         </div>
         <div class="button-container">
-            <button class="next-button" id="step1Next" onclick="processStep(1)" disabled>Next Step</button>
-            <button class="next-button" id="runAllSteps" onclick="processAllSteps()" disabled >Run All Steps</button>
+            <button class="next-button" id="step1Next" onclick="processStep1()" disabled>Next Step</button>
+            <button class="next-button run-all-button" id="runAllSteps" onclick="processAllSteps()" disabled>Run All Steps</button>
         </div>
     </div>
 

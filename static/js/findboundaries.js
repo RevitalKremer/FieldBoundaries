@@ -265,29 +265,47 @@ function clearMapMarker() {
 // ============= STEP 1 FUNCTIONS =============
 
 /**
- * Map Step -> Step 1: Handles successful image load
+ * Map Step -> Step 1: Handles successful image load from capture
  * Processes captured image and enables Step 1
  */
 function handleImageLoad(selectedLat, selectedLng, lat, lng, zoom) {
     console.log('Image loaded successfully');
     
-    const step1Lat = document.querySelector('#step1 input[name="latitude"]');
-    const step1Lng = document.querySelector('#step1 input[name="longitude"]');
- 
+    // Copy coordinates to Step 1
+    const step1Lat = document.getElementById('step1-latitude');
+    const step1Lng = document.getElementById('step1-longitude');
+    
     step1Lat.value = selectedLat;
     step1Lng.value = selectedLng;
+    step1Lat.disabled = true;  // Disable coordinate inputs for captured image
+    step1Lng.disabled = true;
     
-    const scale = this.naturalWidth / 640;
+    // Calculate point position using fixed dimensions
+    const imageWidth = 640;
+    const imageHeight = 640;
     const centerPoint = project(parseFloat(selectedLat), parseFloat(selectedLng), zoom);
     const imageCenter = project(lat, lng, zoom);
     
     const offsetX = (centerPoint.x - imageCenter.x) * 256 * Math.pow(2, zoom);
     const offsetY = (centerPoint.y - imageCenter.y) * 256 * Math.pow(2, zoom);
     
-    const pointX = (this.naturalWidth / 2) + (offsetX * scale);
-    const pointY = (this.naturalHeight / 2) + (offsetY * scale);
+    const pointX = (imageWidth / 2) + offsetX;
+    const pointY = (imageHeight / 2) + offsetY;
     
-    updatePointMarker(pointX, pointY, scale);
+    // Update UI for captured image path
+    document.querySelector('.captured-image-section').style.backgroundColor = '#e8f5e9';
+    document.querySelector('.upload-section').style.opacity = '0.5';
+    document.getElementById('imageInput').disabled = true;
+    
+    // Update point marker using fixed dimensions
+    document.getElementById('pointX').value = Math.round(pointX);
+    document.getElementById('pointY').value = Math.round(pointY);
+    
+    const marker = document.getElementById('pointMarker');
+    marker.style.left = pointX + 'px';
+    marker.style.top = pointY + 'px';
+    marker.style.display = 'block';
+    
     showAndEnableStep('step1');
     clearMapMarker();
 }
@@ -344,11 +362,29 @@ function handleImageInput(e) {
             const img = document.getElementById('previewImage');
             img.src = e.target.result;
             img.style.display = 'block';
+            
+            // Reset point marker and coordinates for uploaded image
             document.getElementById('pointMarker').style.display = 'none';
+            document.getElementById('pointX').value = '';
+            document.getElementById('pointY').value = '';
+            
+            // Reset and enable coordinate inputs for manual entry
+            const step1Lat = document.getElementById('step1-latitude');
+            const step1Lng = document.getElementById('step1-longitude');
+            step1Lat.value = '';
+            step1Lng.value = '';
+            step1Lat.disabled = false;
+            step1Lng.disabled = false;
+            
+            // Update UI for upload path
+            document.querySelector('.upload-section').style.backgroundColor = '#e8f5e9';
+            document.querySelector('.captured-image-section').style.opacity = '0.5';
+            
+            // Update status and buttons
             document.getElementById('step1Next').disabled = true;
             document.getElementById('runAllSteps').disabled = true;
-            document.getElementById('uploadStatus').textContent = 'Click on the image to mark the field point';
-            console.log('🔄 About to call setCurrentStep from handleImageInput with: step1');
+            document.getElementById('uploadStatus').textContent = 'Click on the image to mark the field point and enter coordinates';
+            
             setCurrentStep('step1');
         }
         reader.readAsDataURL(file);
@@ -360,29 +396,63 @@ function handleImageInput(e) {
  * Allows user to mark point on uploaded image
  */
 function handlePreviewImageClick(e) {
-    const rect = this.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    const scaleX = this.naturalWidth / this.width;
-    const scaleY = this.naturalHeight / this.height;
-    
-    selectedPoint = {
-        x: Math.round(x * scaleX),
-        y: Math.round(y * scaleY)
-    };
+    // Only allow clicking if we're in upload mode (coordinates are empty)
+    if (!document.getElementById('imageInput').disabled) {
+        const rect = this.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        const scaleX = this.naturalWidth / this.width;
+        const scaleY = this.naturalHeight / this.height;
+        
+        selectedPoint = {
+            x: Math.round(x * scaleX),
+            y: Math.round(y * scaleY)
+        };
 
-    const marker = document.getElementById('pointMarker');
-    marker.style.left = x + 'px';
-    marker.style.top = y + 'px';
-    marker.style.display = 'block';
+        const marker = document.getElementById('pointMarker');
+        marker.style.left = x + 'px';
+        marker.style.top = y + 'px';
+        marker.style.display = 'block';
 
-    document.getElementById('pointX').value = selectedPoint.x;
-    document.getElementById('pointY').value = selectedPoint.y;
-    
-    document.getElementById('step1Next').disabled = false;
-    document.getElementById('runAllSteps').disabled = false;
-    document.getElementById('uploadStatus').textContent = 'Point selected. Click "Next Step" to continue or "Run All Steps" to process automatically.';
+        document.getElementById('pointX').value = selectedPoint.x;
+        document.getElementById('pointY').value = selectedPoint.y;
+        
+        // Check if coordinates are entered to enable next step
+        checkStep1Completion();
+    }
+}
+
+/**
+ * Step 1: Handles coordinate input changes
+ * Validates coordinates and enables next step if all requirements are met
+ */
+function handleCoordinateInput() {
+    checkStep1Completion();
+}
+
+/**
+ * Step 1: Checks if all requirements are met to enable next step
+ * For upload path: needs point marker and coordinates
+ * For capture path: automatically enabled
+ */
+function checkStep1Completion() {
+    const isUploadMode = !document.getElementById('imageInput').disabled;
+    if (isUploadMode) {
+        const hasPoint = document.getElementById('pointX').value !== '';
+        const hasLat = document.getElementById('step1-latitude').value !== '';
+        const hasLng = document.getElementById('step1-longitude').value !== '';
+        
+        const canProceed = hasPoint && hasLat && hasLng;
+        document.getElementById('step1Next').disabled = !canProceed;
+        document.getElementById('runAllSteps').disabled = !canProceed;
+        
+        if (canProceed) {
+            document.getElementById('uploadStatus').textContent = 'Point selected and coordinates entered. Click "Next Step" to continue.';
+        } else if (hasPoint) {
+            document.getElementById('uploadStatus').textContent = 'Please enter latitude and longitude coordinates.';
+        }
+    }
 }
 
 /**
@@ -395,8 +465,8 @@ async function processStep1() {
         formData.append('staticMapUrl', document.getElementById('previewImage').src);
         formData.append('pointX', document.getElementById('pointX').value);
         formData.append('pointY', document.getElementById('pointY').value);
-        formData.append('latitude', document.querySelector('#step1 input[name="latitude"]').value);
-        formData.append('longitude', document.querySelector('#step1 input[name="longitude"]').value);
+        formData.append('latitude', document.getElementById('step1-latitude').value);
+        formData.append('longitude', document.getElementById('step1-longitude').value);
 
         document.getElementById('uploadStatus').textContent = 'Processing step 1...';
         const result = await fetch('/process_step1', {
@@ -615,12 +685,34 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('📍 About to call setCurrentStep from DOMContentLoaded with: step0');
     setCurrentStep('step0');
 
+    // Add Enter key handler
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            // Find the current step's next button
+            const currentStep = document.querySelector('.step-row.current');
+            if (currentStep) {
+                // Exclude both run-all-button and control-button classes
+                const nextButton = currentStep.querySelector('.next-button:not(.run-all-button):not(.control-button)');
+                if (nextButton && !nextButton.disabled) {
+                    event.preventDefault(); // Prevent default Enter behavior
+                    nextButton.click();
+                }
+            }
+        }
+    });
+
     // Image input handlers
     document.getElementById('imageInput').onchange = function(e) {
         console.log('🔘 Image input changed');
         handleImageInput.call(this, e);
     };
     document.getElementById('previewImage').onclick = handlePreviewImageClick;
+
+    // Add coordinate input handlers
+    const step1Lat = document.getElementById('step1-latitude');
+    const step1Lng = document.getElementById('step1-longitude');
+    if (step1Lat) step1Lat.oninput = handleCoordinateInput;
+    if (step1Lng) step1Lng.oninput = handleCoordinateInput;
 
     // Window size controls
     document.getElementById('windowSize').oninput = function() {
