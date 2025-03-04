@@ -63,7 +63,7 @@ def step4_process_image(mask_path, point_coords):
         output[connected_mask] = (255, 0, 255)  # magenta for connected component
 
         # Save the result
-        cv2.imwrite('images/main_shape.jpg', output)
+        cv2.imwrite('images/step4_main_shape.jpg', output)
         return True, "Connected area filled successfully"
         
     except Exception as e:

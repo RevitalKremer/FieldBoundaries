@@ -1,21 +1,43 @@
 import json
 import cv2
 import numpy as np
+from flask import request
 
 def process_step2():
-    # Get circle center and radius from step 1
-    with open('circle_data.json', 'r') as f:
-        circle_data = json.load(f)
-    
-    success, message = step2_process_image(
-        'images/uploaded_image.jpg',
-        (circle_data['cX'], circle_data['cY']),
-        40  # radius from step 1
-    )
-    
-    if success:
-        return 'success'
-    return message
+    try:
+        # Get circle center from step 1
+        with open('circle_data.json', 'r') as f:
+            circle_data = json.load(f)
+        
+        # Get radius from request if provided, otherwise use default or existing
+        if request.method == 'POST' and 'radius' in request.form:
+            radius = int(request.form['radius'])
+            # Update the circle_data.json with new radius
+            circle_data['radius'] = radius
+            with open('circle_data.json', 'w') as f:
+                json.dump(circle_data, f)
+        else:
+            # Use existing radius or default to 40
+            radius = int(request.form.get('radius', 40))
+        
+        success, message = step2_process_image(
+            'images/uploaded_image.jpg',
+            (circle_data['cX'], circle_data['cY']),
+            radius
+        )
+        
+        # If successful, also update the processed image with new circle
+        if success:
+            # Read the original image
+            image = cv2.imread('images/uploaded_image.jpg')
+            # Draw the circle
+            cv2.circle(image, (circle_data['cX'], circle_data['cY']), radius, (0, 0, 255), 2)
+            # Save the processed image
+            cv2.imwrite('images/processed_image.jpg', image)
+            return 'success'
+        return message
+    except Exception as e:
+        return f"Error in process_step2: {str(e)}"
 
 def get_reference_green(image_path, circle_center, circle_radius):
     """Get the green color reference from inside the red circle"""

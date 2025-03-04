@@ -184,12 +184,13 @@
         </div>
         <div class="button-container">
             <button class="next-button" id="step0Next" onclick="processStep0()" disabled>Capture This Area</button>
+            <button class="next-button run-all-button" id="runAllSteps" onclick="processAllSteps()" disabled>Run All Steps</button>
         </div>
     </div>
 
     <div class="step-row hidden" id="step1">
         <div class="operation">
-            <h3>Step 1: Upload and Mark Image</h3>
+            <h3>Step 1: Capture and Display Image</h3>
             <div class="step-instructions">
                 <p><strong>Instructions:</strong></p>
                 <div class="captured-image-section">
@@ -239,28 +240,39 @@
             </form>
         </div>
         <div class="image-preview-container">
-            <img id="previewImage" src="" alt="Preview">
-            <div id="pointMarker" class="point-marker"></div>
+            <div>
+                <img id="previewImage" src="" alt="Captured Image">
+                <div class="image-label">Captured Image</div>
+                <div id="pointMarker" class="point-marker"></div>
+            </div>
         </div>
         <div class="button-container">
             <button class="next-button" id="step1Next" onclick="processStep1()" disabled>Next Step</button>
-            <button class="next-button run-all-button" id="runAllSteps" onclick="processAllSteps()" disabled>Run All Steps</button>
         </div>
     </div>
 
     <div class="step-row hidden" id="step2">
         <div class="operation">
-            <h3>Step 2: Green Areas Mask</h3>
+            <h3>Step 2: Red Circle for Green Area Analysis</h3>
             <div class="step-instructions">
-                <p><strong>Goal:</strong> Create a mask highlighting areas with similar green color as the field.</p>
+                <p><strong>Goal:</strong> Create a sampling circle around the selected point to analyze the field's green color.</p>
                 <p><strong>Process:</strong></p>
                 <ul>
-                    <li>Analyzing green color within the red circle</li>
-                    <li>Excluding the yellow dot from analysis</li>
-                    <li>Creating mask based on similar green areas</li>
-                    <li>White pixels: Similar to field's green</li>
-                    <li>Black pixels: Different colors</li>
+                    <li>Drawing a red circle around the selected point</li>
+                    <li>Sampling green color values within the circle</li>
+                    <li>Calculating average green index from samples</li>
+                    <li>This index will be used later to identify similar green areas</li>
+                    <li>The yellow dot marks the original selected point</li>
                 </ul>
+                <p><strong>Radius:</strong>
+                    <div class="range-control">
+                        <input type="range" id="radius" min="10" max="100" value="40" oninput="document.getElementById('radiusValue').textContent = this.value + 'px';">
+                        <span id="radiusValue" class="range-value">40px</span>
+                        <button class="next-button control-button" id="applyRadius" onclick="updateCircleRadius()">
+                            Apply
+                        </button>
+                    </div>
+                </p>
                 <p><strong>Status:</strong> <span id="step2Status">Waiting to process...</span></p>
             </div>
         </div>
@@ -277,15 +289,17 @@
 
     <div class="step-row hidden" id="step3">
         <div class="operation">
-            <h3>Step 3: Black Mask (Pixel Density)</h3>
-            <div class="step-instructions">
-                <p><strong>Goal:</strong> Create field shape mask using pixel density analysis.</p>
+            
+            <h3>Step 3: Green Area Mask</h3>
+            <div class="step-instructions">       
+                <p><strong>Goal:</strong> Create a mask highlighting areas with similar green color as the field.</p>
                 <p><strong>Process:</strong></p>
                 <ul>
-                    <li>Analyzing pixel windows</li>
-                    <li>Calculating green pixel density in each window</li>
-                    <li>White regions: High density of field pixels</li>
-                    <li>Black regions: Low density or non-field areas</li>
+                    <li>Analyzing green color within the red circle</li>
+                    <li>Excluding the red dot from analysis</li>
+                    <li>Creating mask based on similar green areas</li>
+                    <li>White pixels: Similar to field's green</li>
+                    <li>Black pixels: Different colors</li>
                 </ul>
                 <p><strong>Status:</strong> <span id="step3Status">Waiting to process...</span></p>
             </div>
@@ -310,7 +324,7 @@
                 <ul>
                     <li>Detecting all shapes in the density mask</li>
                     <li>Finding shape containing original point</li>
-                    <li>Cyan: Main field shape</li>
+                    <li>Magenta: Main field shape</li>
                     <li>Red: Other detected areas</li>
                 </ul>
                 <p><strong>Window Size:</strong> 
@@ -505,9 +519,10 @@
                     
                     // Enable the capture button
                     document.getElementById('stepMapNext').disabled = false;
+                    document.getElementById('runAllSteps').disabled = false;
             
-            // Update status
-                    document.getElementById('mapStatus').textContent = 'Point selected. Click "Capture This Area" to continue.';
+                    // Update status
+                    document.getElementById('mapStatus').textContent = 'Point selected. Click "Capture This Area" to continue or "Run All Steps" to process automatically.';
                 });
             } catch (error) {
                 console.error('Error initializing Google Maps:', error);
@@ -542,31 +557,17 @@
             }
         };
 
-        document.getElementById('previewImage').onclick = function(e) {
-            const rect = this.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            
-            const scaleX = this.naturalWidth / this.width;
-            const scaleY = this.naturalHeight / this.height;
-            
-            selectedPoint = {
-                x: Math.round(x * scaleX),
-                y: Math.round(y * scaleY)
-            };
-
-            const marker = document.getElementById('pointMarker');
-            marker.style.left = x + 'px';
-            marker.style.top = y + 'px';
-            marker.style.display = 'block';
-
-            document.getElementById('pointX').value = selectedPoint.x;
-            document.getElementById('pointY').value = selectedPoint.y;
-            
-            document.getElementById('step1Next').disabled = false;
-            document.getElementById('runAllSteps').disabled = false;
-            document.getElementById('uploadStatus').textContent = 'Point selected. Click "Next Step" to continue or "Run All Steps" to process automatically.';
-        };
+        document.addEventListener('DOMContentLoaded', function() {
+            const img = document.getElementById('previewImage');
+            if (img) {
+                img.onload = function() {
+                    console.log('Image loaded successfully');
+                    // Additional logic for when the image loads
+                };
+            } else {
+                console.error('Element with ID "previewImage" not found.');
+            }
+        });
 
         function updateStepImages(resultImgElement, imagePath, useOverlay = false) {
             resultImgElement.src = '/display/' + imagePath + '?' + new Date().getTime();
@@ -578,63 +579,37 @@
             }
         }
 
-        document.getElementById('step1Next').onclick = function() {
-            // Create FormData object
-            const formData = new FormData();
-            
-            // Get point coordinates
-            const pointX = document.getElementById('pointX').value;
-            const pointY = document.getElementById('pointY').value;
-            
-            if (!pointX || !pointY) {
-                document.getElementById('uploadStatus').textContent = 'Error: Point coordinates not found';
-                return;
-            }
-            
-            // Add the static map URL
-            formData.append('staticMapUrl', document.getElementById('previewImage').src);
-            
-            // Add the point coordinates as integers
-            formData.append('pointX', Math.round(parseFloat(pointX)));
-            formData.append('pointY', Math.round(parseFloat(pointY)));
-            
-            // Add latitude and longitude
-            formData.append('latitude', document.querySelector('#step1 input[name="latitude"]').value);
-            formData.append('longitude', document.querySelector('#step1 input[name="longitude"]').value);
-            
-            // Update status
-            document.getElementById('uploadStatus').textContent = 'Processing...';
-            
-            // Send request to server
-            fetch('/process_step1', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.text())
-            .then(result => {
-                if (result === 'success') {
-                    // Update status and show next step
-                    document.getElementById('uploadStatus').textContent = 'Processing complete!';
-                    document.getElementById('step2').classList.remove('hidden');
-                    
-                    // Update the processed image with cache-busting
-                    const timestamp = new Date().getTime();
-                    document.getElementById('processedImage').src = '/processed_image?' + timestamp;
-                    
-                    // Enable next step button
-                    document.getElementById('step2Next').disabled = false;
-                    
-                    // Scroll to step 2
-                    document.getElementById('step2').scrollIntoView({ behavior: 'smooth' });
-                } else {
-                    document.getElementById('uploadStatus').textContent = 'Error: ' + result;
+        async function processStep1() {
+            try {
+                const formData = new FormData();
+                formData.append('staticMapUrl', document.getElementById('previewImage').src);
+                formData.append('pointX', document.getElementById('pointX').value);
+                formData.append('pointY', document.getElementById('pointY').value);
+                formData.append('latitude', document.getElementById('step1-latitude').value);
+                formData.append('longitude', document.getElementById('step1-longitude').value);
+
+                document.getElementById('uploadStatus').textContent = 'Processing step 1...';
+                const result = await fetch('/process_step1', {
+                    method: 'POST',
+                    body: formData
+                }).then(response => response.text());
+                
+                if (result !== 'success') {
+                    throw new Error('Step 1 failed: ' + result);
                 }
-            })
-            .catch(error => {
-                console.error('Error:', error);
+                
+                // Update the captured image with cache-busting
+                const timestamp = new Date().getTime();
+                document.getElementById('previewImage').src = '/images/captured_image.jpg?' + timestamp;
+                
+                document.getElementById('step2Status').textContent = 'Processing complete!';
+                document.getElementById('step2Next').disabled = false;
+                moveToNextStep('step2');
+            } catch (error) {
+                console.error('Error in Step 1:', error);
                 document.getElementById('uploadStatus').textContent = 'Error: ' + error.message;
-            });
-        };
+            }
+        }
 
         document.getElementById('step2Next').onclick = function() {
             document.getElementById('step3').classList.remove('hidden');
@@ -674,7 +649,7 @@
                         .then(response => response.text())
                         .then(result => {
                             if (result === 'success') {
-                                updateStepImages(document.getElementById('mainShapeImage'), 'main_shape.jpg');
+                                updateStepImages(document.getElementById('mainShapeImage'), 'step4_main_shape.jpg');
                                 document.getElementById('step4Status').textContent = 
                                     'Processing complete! (Window size: 1px). Adjust slider and click Apply to refine.';
                                 document.getElementById('step4Next').disabled = false;
@@ -711,7 +686,7 @@
                         .then(response => response.text())
                         .then(result => {
                             if (result === 'success') {
-                                updateStepImages(document.getElementById('mainShapeImage'), 'main_shape.jpg');
+                                updateStepImages(document.getElementById('mainShapeImage'), 'step4_main_shape.jpg');
                                 document.getElementById('step4Status').textContent = 
                                     `Processing complete! (Window size: ${windowSize}px)`;
                                 document.getElementById('step4Next').disabled = false;
@@ -742,7 +717,7 @@
                 .then(response => response.text())
                 .then(result => {
                     if (result === 'success') {
-                        document.getElementById('smoothedShapeImage').src = '/display/smoothed_shape.jpg?' + new Date().getTime();
+                        document.getElementById('smoothedShapeImage').src = '/display/step5_smoothed_shape.jpg?' + new Date().getTime();
                         document.getElementById('step5Status').textContent = 
                             'Processing complete! (Smoothing: 0.0100). Adjust slider and click Apply to refine.';
                         document.getElementById('step5Next').disabled = false;
@@ -772,7 +747,7 @@
                 .then(response => response.text())
                 .then(result => {
                     if (result === 'success') {
-                        document.getElementById('smoothedShapeImage').src = '/display/smoothed_shape.jpg?' + new Date().getTime();
+                        document.getElementById('smoothedShapeImage').src = '/display/step5_smoothed_shape.jpg?' + new Date().getTime();
                         document.getElementById('step5Status').textContent = 
                             `Processing complete! (Smoothing: ${epsilonFactor})`;
                         document.getElementById('step5Next').disabled = false;
@@ -798,7 +773,7 @@
                 .then(response => response.text())
                 .then(result => {
                     if (result === 'success') {
-                        updateStepImages(document.getElementById('maskedFieldImage'), 'masked_field.jpg');
+                        updateStepImages(document.getElementById('maskedFieldImage'), 'step6_masked_field.jpg');
                         document.getElementById('step6Status').textContent = 'Processing complete!';
                         document.getElementById('step6Next').disabled = false;
                         document.getElementById('step6').scrollIntoView({ behavior: 'smooth' });
@@ -816,7 +791,7 @@
                 .then(response => response.text())
                 .then(result => {
                     if (result === 'success') {
-                        document.getElementById('finalImage').src = '/display/final_with_boundary.jpg?' + new Date().getTime();
+                        document.getElementById('finalImage').src = '/display/step7_final_with_boundary.jpg?' + new Date().getTime();
                         document.getElementById('step7Status').textContent = 'Processing complete! GeoJSON boundary shown in cyan. Ready for download.';
                         document.getElementById('downloadGeoJSON').disabled = false;
                         document.getElementById('step7').scrollIntoView({ behavior: 'smooth' });
@@ -828,6 +803,25 @@
 
         async function processAllSteps() {
             try {
+                // First execute processStep0 to capture the area
+                await new Promise((resolve) => {
+                    // Get the current image source before proceeding
+                    const currentPreviewImage = document.getElementById('previewImage').src;
+                    
+                    if (!currentPreviewImage || currentPreviewImage === '') {
+                        processStep0();
+                        
+                        // Wait for the image to load after processStep0
+                        const img = document.getElementById('previewImage');
+                        img.onload = () => {
+                            resolve();
+                        };
+                    } else {
+                        // If image is already captured, proceed immediately
+                        resolve();
+                    }
+                });
+
                 // Step 1: Create form data with all necessary fields
                 const formData = new FormData();
                 
@@ -870,10 +864,10 @@
                 }).then(response => response.text());
                 if (step3Result !== 'success') throw new Error('Step 3 failed');
                 
-                const step4Result = await fetch('/process_step4').then(response => response.text());
-                if (step4Result !== 'success') throw new Error('Step 4 failed');
+                // const step4Result = await fetch('/process_step4').then(response => response.text());
+                // if (step4Result !== 'success') throw new Error('Step 4 failed');
                 document.getElementById('step4').classList.remove('hidden');
-                updateStepImages(document.getElementById('mainShapeImage'), 'main_shape.jpg');
+                updateStepImages(document.getElementById('mainShapeImage'), 'step4_main_shape.jpg');
                 document.getElementById('step4Status').textContent = 'Processing complete!';
                 
                 // Process Step 5
@@ -885,21 +879,21 @@
                     body: formData5
                 }).then(response => response.text());
                 if (step5Result !== 'success') throw new Error('Step 5 failed');
-                document.getElementById('smoothedShapeImage').src = '/display/smoothed_shape.jpg?' + new Date().getTime();
+                document.getElementById('smoothedShapeImage').src = '/display/step5_smoothed_shape.jpg?' + new Date().getTime();
                 document.getElementById('step5Status').textContent = 'Processing complete!';
                 
                 // Process Step 6
                 document.getElementById('step6').classList.remove('hidden');
                 const step6Result = await fetch('/process_step6').then(response => response.text());
                 if (step6Result !== 'success') throw new Error('Step 6 failed');
-                updateStepImages(document.getElementById('maskedFieldImage'), 'masked_field.jpg');
+                updateStepImages(document.getElementById('maskedFieldImage'), 'step6_masked_field.jpg');
                 document.getElementById('step6Status').textContent = 'Processing complete!';
                 
                 // Process Step 7
                 document.getElementById('step7').classList.remove('hidden');
                 const step7Result = await fetch('/process_step7').then(response => response.text());
                 if (step7Result !== 'success') throw new Error('Step 7 failed');
-                document.getElementById('finalImage').src = '/display/final_with_boundary.jpg?' + new Date().getTime();
+                document.getElementById('finalImage').src = '/display/step7_final_with_boundary.jpg?' + new Date().getTime();
                 document.getElementById('step7Status').textContent = 'Processing complete! GeoJSON boundary shown in cyan. Ready for download.';
                 document.getElementById('downloadGeoJSON').disabled = false;
                 

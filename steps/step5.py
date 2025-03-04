@@ -5,7 +5,7 @@ import json
 
 def process_step5():
     epsilon_factor = float(request.form.get('epsilonFactor', 0.001))
-    success, message = smooth_shape_edges('images/main_shape.jpg', epsilon_factor)
+    success, message = smooth_shape_edges('images/step4_main_shape.jpg', epsilon_factor)
     if success:
         return 'success'
     return message
@@ -64,7 +64,7 @@ def smooth_shape_edges(image_path, epsilon_factor=0.001):
         np.save('smoothed_contour.npy', smoothed_contour)
 
         # Save the result
-        cv2.imwrite('images/smoothed_shape.jpg', output)
+        cv2.imwrite('images/step5_smoothed_shape.jpg', output)
         return True, "Shape smoothed successfully"
         
     except Exception as e:

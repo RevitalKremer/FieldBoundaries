@@ -1,5 +1,3 @@
-console.log('🔥 JavaScript file loaded!');
-
 // Global variables for tracking state across steps
 let selectedPoint = null;
 let map;
@@ -13,17 +11,12 @@ let currentStep = 'step0';  // Fix: Remove extra quote
  * @param {string} stepId - The ID of the step to set as current ('step0', 'step1', etc.)
  */
 function setCurrentStep(stepId) {
-    console.group('Step Change');
-    console.log('%cStep Change:', 'color: blue; font-weight: bold');
-    console.log('Previous step:', currentStep);
-    console.log('New step:', stepId);
     
     // Update the current step variable
     currentStep = stepId;
     
     // Remove 'current' class from all steps
     const allSteps = document.querySelectorAll('.step-row');
-    console.log('Total steps found:', allSteps.length);
     allSteps.forEach(step => {
         if (step.classList.contains('current')) {
             console.log('Removing current class from:', step.id);
@@ -35,12 +28,7 @@ function setCurrentStep(stepId) {
     const currentStepElement = document.getElementById(stepId);
     if (currentStepElement) {
         currentStepElement.classList.add('current');
-        console.log('Added current class to:', stepId);
-        console.log('Current step element classes:', currentStepElement.className);
-    } else {
-        console.warn('Could not find element with ID:', stepId);
-    }
-    console.groupEnd();
+
 }
 
 /**
@@ -48,19 +36,13 @@ function setCurrentStep(stepId) {
  * @param {string} nextStepId - The ID of the next step
  */
 function moveToNextStep(nextStepId) {
-    console.log('🔄 moveToNextStep called with:', nextStepId);
-    
     // Show the next step
     const nextStep = document.getElementById(nextStepId);
     if (nextStep) {
         nextStep.classList.remove('hidden');
-        console.log('✅ Removed hidden class from:', nextStepId);
-    } else {
-        console.warn('❌ Could not find next step element:', nextStepId);
     }
     
     // Update current step
-    console.log('📍 About to call setCurrentStep with:', nextStepId);
     setCurrentStep(nextStepId);
     
     // Scroll to the new step
@@ -178,6 +160,7 @@ function handleMapInitError(error) {
     `;
     
     document.getElementById('step0Next').disabled = true;
+    document.getElementById('runAllSteps').disabled = true;
 }
 
 /**
@@ -188,9 +171,11 @@ function handleTilesLoaded() {
     const mapDiv = document.getElementById('map');
     if (mapDiv.innerHTML.toLowerCase().includes('sorry')) {
         document.getElementById('step0Next').disabled = true;
+        document.getElementById('runAllSteps').disabled = true;
         document.getElementById('uploadStatus').textContent = 'No satellite imagery available for this location. Please try a different area.';
     } else {
         document.getElementById('step0Next').disabled = false;
+        document.getElementById('runAllSteps').disabled = false;
         document.getElementById('uploadStatus').textContent = 'Click "Capture This Area" when ready.';
     }
 }
@@ -207,6 +192,7 @@ function handleMapClick(e) {
     updateMapMarker(e.latLng);
     
     document.getElementById('step0Next').disabled = false;
+    document.getElementById('runAllSteps').disabled = false;
     document.getElementById('mapStatus').textContent = 'Point selected. Click "Capture This Area" to continue.';
 }
 
@@ -382,7 +368,6 @@ function handleImageInput(e) {
             
             // Update status and buttons
             document.getElementById('step1Next').disabled = true;
-            document.getElementById('runAllSteps').disabled = true;
             document.getElementById('uploadStatus').textContent = 'Click on the image to mark the field point and enter coordinates';
             
             setCurrentStep('step1');
@@ -445,7 +430,6 @@ function checkStep1Completion() {
         
         const canProceed = hasPoint && hasLat && hasLng;
         document.getElementById('step1Next').disabled = !canProceed;
-        document.getElementById('runAllSteps').disabled = !canProceed;
         
         if (canProceed) {
             document.getElementById('uploadStatus').textContent = 'Point selected and coordinates entered. Click "Next Step" to continue.';
@@ -499,12 +483,49 @@ async function processStep2() {
         const result = await fetch('/process_step2').then(response => response.text());
         if (result !== 'success') throw new Error('Step 2 failed');
         
-        updateStepImages(document.getElementById('greenMaskImage'), 'green_mask.jpg');
+        // Update the green mask image with cache-busting
+        const timestamp = new Date().getTime();
+        document.getElementById('greenMaskImage').src = '/display/green_mask.jpg?' + timestamp;
+        
         document.getElementById('step3Status').textContent = 'Processing complete!';
         document.getElementById('step3Next').disabled = false;
         moveToNextStep('step3');
     } catch (error) {
         console.error('Error in Step 2:', error);
+        document.getElementById('step2Status').textContent = 'Error: ' + error.message;
+    }
+}
+
+/**
+ * Step 2: Updates circle radius based on slider value
+ * Redraws the sampling circle with new radius
+ */
+async function updateCircleRadius() {
+    try {
+        const radius = document.getElementById('radius').value;
+        const formData = new FormData();
+        formData.append('radius', radius);
+        
+        document.getElementById('step2Status').textContent = 'Updating circle radius...';
+        
+        const result = await fetch('/process_step1', {  // Correct endpoint for updating circle
+            method: 'POST',
+            body: formData
+        }).then(response => response.text());
+        
+        if (result !== 'success') {
+            throw new Error('Failed to update circle radius');
+        }
+        
+        // Update only the processed image with cache-busting
+        const timestamp = new Date().getTime();
+        document.getElementById('processedImage').src = '/processed_image?' + timestamp;
+        
+        document.getElementById('step2Status').textContent = `Circle radius updated to ${radius}px!`;
+        document.getElementById('step2Next').disabled = false;
+        
+    } catch (error) {
+        console.error('Error updating circle radius:', error);
         document.getElementById('step2Status').textContent = 'Error: ' + error.message;
     }
 }
@@ -529,7 +550,7 @@ async function processStep3And4() {
         const step4Result = await fetch('/process_step4').then(response => response.text());
         if (step4Result !== 'success') throw new Error('Step 4 failed');
         
-        updateStepImages(document.getElementById('mainShapeImage'), 'main_shape.jpg');
+        updateStepImages(document.getElementById('mainShapeImage'), 'step4_main_shape.jpg');
         document.getElementById('step4Status').textContent = 'Processing complete!';
         document.getElementById('step4Next').disabled = false;
         moveToNextStep('step4');
@@ -556,7 +577,7 @@ async function processStep5() {
         }).then(response => response.text());
         if (result !== 'success') throw new Error('Step 5 failed');
         
-        document.getElementById('smoothedShapeImage').src = '/display/smoothed_shape.jpg?' + new Date().getTime();
+        document.getElementById('smoothedShapeImage').src = '/display/step5_smoothed_shape.jpg?' + new Date().getTime();
         document.getElementById('step5Status').textContent = 'Processing complete!';
         document.getElementById('step5Next').disabled = false;
         moveToNextStep('step5');
@@ -577,7 +598,7 @@ async function processStep6() {
         const result = await fetch('/process_step6').then(response => response.text());
         if (result !== 'success') throw new Error('Step 6 failed');
         
-        updateStepImages(document.getElementById('maskedFieldImage'), 'masked_field.jpg');
+        updateStepImages(document.getElementById('maskedFieldImage'), 'step6_masked_field.jpg');
         document.getElementById('step6Status').textContent = 'Processing complete!';
         document.getElementById('step6Next').disabled = false;
         moveToNextStep('step6');
@@ -598,7 +619,7 @@ async function processStep7() {
         const result = await fetch('/process_step7').then(response => response.text());
         if (result !== 'success') throw new Error('Step 7 failed');
         
-        document.getElementById('finalImage').src = '/display/final_with_boundary.jpg?' + new Date().getTime();
+        document.getElementById('finalImage').src = '/display/step7_final_with_boundary.jpg?' + new Date().getTime();
         document.getElementById('step7Status').textContent = 'Processing complete! GeoJSON boundary shown in cyan. Ready for download.';
         document.getElementById('downloadGeoJSON').disabled = false;
         moveToNextStep('step7');
@@ -616,6 +637,7 @@ async function processStep7() {
  */
 async function processAllSteps() {
     try {
+        await processStep0();
         await processStep1();
         await processStep2();
         await processStep3And4();
@@ -672,17 +694,10 @@ async function processStep(stepNumber) {
 // ============= EVENT LISTENERS =============
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 DOMContentLoaded event fired');
-    
     // Check if elements exist
     const mapStep = document.getElementById('step0');
-    console.log('📌 step0 element exists:', !!mapStep);
-    if (mapStep) {
-        console.log('📌 step0 classes:', mapStep.className);
-    }
     
     // Set initial current step
-    console.log('📍 About to call setCurrentStep from DOMContentLoaded with: step0');
     setCurrentStep('step0');
 
     // Add Enter key handler
@@ -706,7 +721,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('🔘 Image input changed');
         handleImageInput.call(this, e);
     };
-    document.getElementById('previewImage').onclick = handlePreviewImageClick;
+   
 
     // Add coordinate input handlers
     const step1Lat = document.getElementById('step1-latitude');
@@ -749,7 +764,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error('Step 4 failed');
             }
             
-            updateStepImages(document.getElementById('mainShapeImage'), 'main_shape.jpg');
+            updateStepImages(document.getElementById('mainShapeImage'), 'step4_main_shape.jpg');
             document.getElementById('step4Status').textContent = `Processing complete! (Window size: ${windowSize}px)`;
             document.getElementById('step4Next').disabled = false;
         } catch (error) {
@@ -777,7 +792,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error('Step 5 failed');
             }
             
-            updateStepImages(document.getElementById('smoothedShapeImage'), 'smoothed_shape.jpg');
+            updateStepImages(document.getElementById('smoothedShapeImage'), 'step5_smoothed_shape.jpg');
             document.getElementById('step5Status').textContent = `Processing complete! (Smoothing factor: ${parseFloat(epsilonFactor).toFixed(4)})`;
             document.getElementById('step5Next').disabled = false;
         } catch (error) {

@@ -46,7 +46,7 @@ def step6_process_image(original_image_path, smoothed_shape_path):
         cv2.circle(result, (circle_data['cX'], circle_data['cY']), point_radius, (0, 0, 255), -1)  # filled circle
 
         # Save the result
-        cv2.imwrite('images/masked_field.jpg', result)
+        cv2.imwrite('images/step6_masked_field.jpg', result)
         return True, "Field area masked and point marked successfully"
         
     except Exception as e:
