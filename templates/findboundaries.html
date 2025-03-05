@@ -250,16 +250,15 @@
 
     <div class="step-row hidden" id="step2">
         <div class="operation">
-            <h3>Step 2: Green Areas Mask</h3>
+            <h3>Step 2: Track the Red Dot</h3>
             <div class="step-instructions">
-                <p><strong>Goal:</strong> Create a mask highlighting areas with similar green color as the field.</p>
+                <p><strong>Goal:</strong> Detect and highlight the red dot marking the relevant field.</p>
                 <p><strong>Process:</strong></p>
                 <ul>
-                    <li>Analyzing green color within the red circle</li>
-                    <li>Excluding the yellow dot from analysis</li>
-                    <li>Creating mask based on similar green areas</li>
-                    <li>White pixels: Similar to field's green</li>
-                    <li>Black pixels: Different colors</li>
+                    <li>Locating the red dot position in the image</li>
+                    <li>Drawing a red circle around the selected point</li>
+                    <li>Preparing the area inside the circle for analysis</li>
+                    <li>This circle defines the sampling region</li>
                 </ul>
                 <p><strong>Status:</strong> <span id="step2Status">Waiting to process...</span></p>
             </div>
@@ -298,7 +297,7 @@
             </div>
         </div>
         <div class="button-container">
-            <button class="next-button" id="step3Next" onclick="processStep100And4()" disabled>Next Step</button>
+            <button class="next-button" id="step3Next" onclick="processStep100And5()" disabled>Next Step</button>
         </div>
     </div>
 
