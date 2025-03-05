@@ -87,11 +87,10 @@ function updateStepImages(resultImgElement, imagePath, useOverlay = false) {
  * Used after automatic processing to ensure all steps are accessible
  */
 function enableAllButtons() {
-    document.getElementById('step2Next').disabled = false;
-    document.getElementById('step3Next').disabled = false;
-    document.getElementById('step4Next').disabled = false;
-    document.getElementById('step5Next').disabled = false;
-    document.getElementById('step6Next').disabled = false;
+    document.querySelectorAll('.next-button').forEach(button => {
+        button.disabled = false;
+    });
+    
 }
 
 /**
@@ -506,13 +505,13 @@ async function processStep3() {
     }
 }
 
-// ============= STEPS 100 & 4 FUNCTIONS =============
+// ============= STEPS 100 & 5 FUNCTIONS =============
 
 /**
- * Steps 100 & 4: Processes pixel density and identifies main shape
+ * Steps 100 & 5: Processes pixel density and identifies main shape
  * Creates black mask and identifies the main field shape
  */
-async function processStep100And4() {
+async function processStep100And5() {
     try {
         const formData = new FormData();
         formData.append('windowSize', '1');
@@ -523,58 +522,37 @@ async function processStep100And4() {
         }).then(response => response.text());
         if (step100Result !== 'success') throw new Error('Step 100 failed');
         
-        const step4Result = await fetch('/process_step4').then(response => response.text());
-        if (step4Result !== 'success') throw new Error('Step 4 failed');
+        const step5Result = await fetch('/process_step5').then(response => response.text());
+        if (step5Result !== 'success') throw new Error('Step 5 failed');
         
-        updateStepImages(document.getElementById('mainShapeImage'), 'step4_main_shape.jpg');
-        document.getElementById('step4Status').textContent = 'Processing complete!';
-        document.getElementById('step4Next').disabled = false;
-        moveToNextStep('step4');
-    } catch (error) {
-        showErrorPopup('Steps 100 & 4', error);
-        document.getElementById('step3Status').textContent = 'Error: ' + error.message;
-    }
-}
-
-// ============= STEP 5 FUNCTIONS =============
-
-/**
- * Step 5: Applies edge smoothing
- * Smooths the edges of the identified field shape
- */
-async function processStep5() {
-    try {
-        const formData = new FormData();
-        formData.append('epsilonFactor', '0.01');
-        
-        const result = await fetch('/process_step5', {
-            method: 'POST',
-            body: formData
-        }).then(response => response.text());
-        if (result !== 'success') throw new Error('Step 5 failed');
-        
-        updateStepImages(document.getElementById('smoothedShapeImage'), 'step5_smoothed_shape.jpg');
+        updateStepImages(document.getElementById('mainShapeImage'), 'step5_main_shape.jpg');
         document.getElementById('step5Status').textContent = 'Processing complete!';
         document.getElementById('step5Next').disabled = false;
         moveToNextStep('step5');
     } catch (error) {
-        showErrorPopup('Step 5', error);
-        document.getElementById('step4Status').textContent = 'Error: ' + error.message;
+        showErrorPopup('Steps 100 & 5', error);
+        document.getElementById('step3Status').textContent = 'Error: ' + error.message;
     }
 }
 
 // ============= STEP 6 FUNCTIONS =============
 
 /**
- * Step 6: Isolates the field area
- * Creates masked version showing only the identified field
+ * Step 6: Applies edge smoothing
+ * Smooths the edges of the identified field shape
  */
 async function processStep6() {
     try {
-        const result = await fetch('/process_step6').then(response => response.text());
+        const formData = new FormData();
+        formData.append('epsilonFactor', '0.01');
+        
+        const result = await fetch('/process_step6', {
+            method: 'POST',
+            body: formData
+        }).then(response => response.text());
         if (result !== 'success') throw new Error('Step 6 failed');
         
-        updateStepImages(document.getElementById('maskedFieldImage'), 'step6_masked_field.jpg');
+        updateStepImages(document.getElementById('smoothedShapeImage'), 'step6_smoothed_shape.jpg');
         document.getElementById('step6Status').textContent = 'Processing complete!';
         document.getElementById('step6Next').disabled = false;
         moveToNextStep('step6');
@@ -587,21 +565,42 @@ async function processStep6() {
 // ============= STEP 7 FUNCTIONS =============
 
 /**
- * Step 7: Generates final GeoJSON output
- * Creates downloadable GeoJSON file from field boundary
+ * Step 7: Isolates the field area
+ * Creates masked version showing only the identified field
  */
 async function processStep7() {
     try {
         const result = await fetch('/process_step7').then(response => response.text());
         if (result !== 'success') throw new Error('Step 7 failed');
         
-        updateStepImages(document.getElementById('finalImage'), 'step7_final_with_boundary.jpg');
-        document.getElementById('step7Status').textContent = 'Processing complete! GeoJSON boundary shown in cyan. Ready for download.';
-        document.getElementById('downloadGeoJSON').disabled = false;
+        updateStepImages(document.getElementById('maskedFieldImage'), 'step7_masked_field.jpg');
+        document.getElementById('step7Status').textContent = 'Processing complete!';
+        document.getElementById('step7Next').disabled = false;
         moveToNextStep('step7');
     } catch (error) {
         showErrorPopup('Step 7', error);
         document.getElementById('step6Status').textContent = 'Error: ' + error.message;
+    }
+}
+
+// ============= STEP 8 FUNCTIONS =============
+
+/**
+ * Step 8: Generates final GeoJSON output
+ * Creates downloadable GeoJSON file from field boundary
+ */
+async function processStep8() {
+    try {
+        const result = await fetch('/process_step8').then(response => response.text());
+        if (result !== 'success') throw new Error('Step 8 failed');
+        
+        updateStepImages(document.getElementById('finalImage'), 'step8_final_with_boundary.jpg');
+        document.getElementById('step8Status').textContent = 'Processing complete! GeoJSON boundary shown in cyan. Ready for download.';
+        document.getElementById('downloadGeoJSON').disabled = false;
+        moveToNextStep('step8');
+    } catch (error) {
+        showErrorPopup('Step 8', error);
+        document.getElementById('step7Status').textContent = 'Error: ' + error.message;
     }
 }
 
@@ -615,13 +614,13 @@ async function processAllSteps() {
     try {
         await processStep2();
         await processStep3();
-        await processStep100And4();
-        await processStep5();
+        await processStep100And5();
         await processStep6();
         await processStep7();
+        await processStep8();
         
         enableAllButtons();
-        document.getElementById('step7').scrollIntoView({ behavior: 'smooth' });
+        document.getElementById('step8').scrollIntoView({ behavior: 'smooth' });
         
     } catch (error) {
         showErrorPopup('Automatic Processing', error);
@@ -642,17 +641,17 @@ async function processStep(stepNumber) {
             case 3:
                 await processStep3();
                 break;
-            case 4:
-                await processStep100And4();
-                break;
             case 5:
-                await processStep5();
+                await processStep100And5();
                 break;
             case 6:
                 await processStep6();
                 break;
             case 7:
                 await processStep7();
+                break;
+            case 8:
+                await processStep8();
                 break;
             default:
                 throw new Error(`Invalid step number: ${stepNumber}`);
@@ -718,8 +717,8 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('applyWindowSize').onclick = async function() {
         try {
             const windowSize = document.getElementById('windowSize').value;
-            document.getElementById('step4Status').textContent = 'Processing...';
-            document.getElementById('step4Next').disabled = true;
+            document.getElementById('step5Status').textContent = 'Processing...';
+            document.getElementById('step5Next').disabled = true;
             
             const formData = new FormData();
             formData.append('windowSize', windowSize);
@@ -733,17 +732,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error('Step 3 failed');
             }
             
-            const step4Result = await fetch('/process_step4').then(response => response.text());
-            if (step4Result !== 'success') {
-                throw new Error('Step 4 failed');
+            const step5Result = await fetch('/process_step5').then(response => response.text());
+            if (step5Result !== 'success') {
+                throw new Error('Step 5 failed');
             }
             
-            updateStepImages(document.getElementById('mainShapeImage'), 'step4_main_shape.jpg');
-            document.getElementById('step4Status').textContent = `Processing complete! (Window size: ${windowSize}px)`;
-            document.getElementById('step4Next').disabled = false;
+            updateStepImages(document.getElementById('mainShapeImage'), 'step5_main_shape.jpg');
+            document.getElementById('step5Status').textContent = `Processing complete! (Window size: ${windowSize}px)`;
+            document.getElementById('step5Next').disabled = false;
         } catch (error) {
             console.error('Error:', error);
-            document.getElementById('step4Status').textContent = 'Error: ' + error.message;
+            document.getElementById('step5Status').textContent = 'Error: ' + error.message;
         }
     };
 
@@ -751,27 +750,27 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('applySmoothing').onclick = async function() {
         try {
             const epsilonFactor = document.getElementById('epsilonFactor').value;
-            document.getElementById('step5Status').textContent = 'Processing...';
-            document.getElementById('step5Next').disabled = true;
+            document.getElementById('step6Status').textContent = 'Processing...';
+            document.getElementById('step6Next').disabled = true;
             
             const formData = new FormData();
             formData.append('epsilonFactor', epsilonFactor);
             
-            const result = await fetch('/process_step5', {
+            const result = await fetch('/process_step6', {
                 method: 'POST',
                 body: formData
             }).then(response => response.text());
             
             if (result !== 'success') {
-                throw new Error('Step 5 failed');
+                throw new Error('Step 6 failed');
             }
             
-            updateStepImages(document.getElementById('smoothedShapeImage'), 'step5_smoothed_shape.jpg');
-            document.getElementById('step5Status').textContent = `Processing complete! (Smoothing factor: ${parseFloat(epsilonFactor).toFixed(4)})`;
-            document.getElementById('step5Next').disabled = false;
+            updateStepImages(document.getElementById('smoothedShapeImage'), 'step6_smoothed_shape.jpg');
+            document.getElementById('step6Status').textContent = `Processing complete! (Smoothing factor: ${parseFloat(epsilonFactor).toFixed(4)})`;
+            document.getElementById('step6Next').disabled = false;
         } catch (error) {
             console.error('Error:', error);
-            document.getElementById('step5Status').textContent = 'Error: ' + error.message;
+            document.getElementById('step6Status').textContent = 'Error: ' + error.message;
         }
     };
 }); 

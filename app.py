@@ -13,11 +13,11 @@ import numpy as np
 import json
 from steps.step2 import process_step2
 from steps.step3 import process_step3
-from steps.step4 import process_step100
-from steps.step4 import process_step4
-from steps.step5 import process_step5    
-from steps.step6 import process_step6
+from steps.step5 import process_step100
+from steps.step5 import process_step5
+from steps.step6 import process_step6    
 from steps.step7 import process_step7
+from steps.step8 import process_step8
 import os
 from geojson import Feature, Polygon, FeatureCollection
 import time

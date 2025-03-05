@@ -1,3 +1,4 @@
+'''
 import json
 import cv2
 import numpy as np
@@ -116,3 +117,5 @@ def step4_process_image(mask_path, point_coords):
         
     except Exception as e:
         return False, f"Error in flood fill: {str(e)}" 
+
+        '''
