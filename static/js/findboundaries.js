@@ -393,11 +393,12 @@ async function processAllSteps(event) {
             5: processStep5,
             6: processStep6,
             7: processStep7,
-            8: processStep8
+            8: processStep8,
+            9: processStep9
         };
         
         // Process all steps from current step onward
-        for (let i = stepNumber; i <= 8; i++) {
+        for (let i = stepNumber; i <= 9; i++) {
             if (stepFunctions[i]) {
                 await stepFunctions[i]();
             }
@@ -439,7 +440,7 @@ async function processAllSteps(event) {
             } else {
                 // No images, scroll immediately
                 lastStep.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+        }
         }
         
     } catch (error) {
@@ -659,6 +660,7 @@ async function processStep2WithRadius() {
         const pointY = document.getElementById('pointY').value;
         const latitude = document.getElementById('step1-latitude').value;
         const longitude = document.getElementById('step1-longitude').value;
+        const zoom = document.getElementById('zoomSlider').value;
         
         if (!pointX || !pointY) {
             document.getElementById('uploadStatus').textContent = 'Error: Point coordinates not found';
@@ -676,6 +678,7 @@ async function processStep2WithRadius() {
         formData.append('pointY', Math.round(parseFloat(pointY)));
         formData.append('latitude', latitude);
         formData.append('longitude', longitude);
+        formData.append('zoom', zoom);
         formData.append('radiusSize', radiusSize);
 
         const result = await fetch('/process_step2', {
@@ -941,5 +944,90 @@ async function processStep8() {
     } catch (error) {
         showErrorPopup('Step 8', error);
         document.getElementById('step7Status').textContent = 'Error: ' + error.message;
+    }
+}
+
+// ============= STEP 9 FUNCTIONS =============
+
+/**
+ * Step 9: Displays field boundary on interactive map
+ * Shows the generated GeoJSON on a Google Maps satellite view
+ */
+async function processStep9() {
+    try {
+        // First, process step 9 on the server
+        const response = await fetch('/process_step9');
+        const result = await response.text();
+        if (result !== 'success') {
+            throw new Error(result);
+        }
+
+        // Get the original coordinates
+        const selectedLat = parseFloat(document.getElementById('step1-latitude').value);
+        const selectedLng = parseFloat(document.getElementById('step1-longitude').value);
+        const originalZoom = parseInt(document.getElementById('zoomSlider').value);
+
+        // Initialize the result map
+        const resultMap = new google.maps.Map(document.getElementById('resultMap'), {
+            center: { lat: selectedLat, lng: selectedLng },
+            zoom: originalZoom,
+            mapTypeId: 'satellite',
+            streetViewControl: false,
+            fullscreenControl: false
+        });
+
+        // Add marker for the selected point
+        const marker = new google.maps.Marker({
+            position: { lat: selectedLat, lng: selectedLng },
+            map: resultMap,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                fillColor: '#FF0000',
+                fillOpacity: 1.0,
+                strokeColor: '#FFFFFF',
+                strokeWeight: 2,
+                scale: 8
+            }
+        });
+
+        // Fetch and display the GeoJSON data
+        const geojsonResponse = await fetch('/get_geojson');
+        const geojsonData = await geojsonResponse.json();
+        console.log('GeoJSON data:', geojsonData); // Debug log
+
+        // Add the GeoJSON to the map
+        resultMap.data.addGeoJson(geojsonData);
+        resultMap.data.setStyle({
+            fillColor: '#00BCD4',
+            fillOpacity: 0.3,
+            strokeColor: '#00BCD4',
+            strokeWeight: 2
+        });
+
+        // Set up zoom slider
+        const zoomSlider = document.getElementById('resultZoomSlider');
+        const zoomLevel = document.getElementById('resultZoomLevel');
+        
+        zoomSlider.value = originalZoom;
+        zoomLevel.textContent = originalZoom;
+        
+        zoomSlider.addEventListener('input', () => {
+            const zoom = parseInt(zoomSlider.value);
+            resultMap.setZoom(zoom);
+            zoomLevel.textContent = zoom;
+        });
+
+        resultMap.addListener('zoom_changed', () => {
+            const zoom = resultMap.getZoom();
+            zoomSlider.value = zoom;
+            zoomLevel.textContent = zoom;
+        });
+
+        document.getElementById('step9Status').textContent = 'Field boundary displayed on map';
+        moveToNextStep('step9');
+
+    } catch (error) {
+        console.error('Error in processStep9:', error);
+        document.getElementById('step9Status').textContent = 'Error: ' + error.message;
     }
 } 

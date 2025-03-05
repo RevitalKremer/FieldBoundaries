@@ -350,6 +350,34 @@
             </div>
         </div>
         <div class="button-container">
+            <button class="next-button" id="step8Next" onclick="processStep9()" disabled>Next Step</button>
+            <button class="next-button run-all-button" id="step8RunAll" onclick="processAllSteps(event)" disabled>Run All Steps</button>
+        </div>
+    </div>
+
+    <div class="step-row hidden" id="step9">
+        <div class="operation">
+            <h3>Step 9: Field Boundary Map</h3>
+            <div class="step-instructions">
+                <p><strong>Goal:</strong> Display the field boundary on an interactive map.</p>
+                <p><strong>Process:</strong></p>
+                <ul>
+                    <li>Loading the generated GeoJSON</li>
+                    <li>Displaying boundary on satellite map</li>
+                    <li>Allowing interactive exploration</li>
+                </ul>
+                <p><strong>Status:</strong> <span id="step9Status">Waiting to process...</span></p>
+            </div>
+        </div>
+        <div class="map-container">
+            <div id="resultMap"></div>
+            <div class="map-controls">
+                <label>Zoom:</label>
+                <input type="range" id="resultZoomSlider" min="1" max="21" value="17">
+                <span id="resultZoomLevel">17</span>
+            </div>
+        </div>
+        <div class="button-container">
             <button class="next-button" id="downloadGeoJSON" onclick="window.location.href = '/download_geojson'" disabled>Download GeoJSON</button>
         </div>
     </div>

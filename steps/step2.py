@@ -20,8 +20,8 @@ def download_image_from_url(url):
         return False
 
 
-def step1_process_image_with_point(image_path, point_coords, radius=40):
-    """Process image to draw circle around selected point"""
+def step1_process_image_with_point(image_path, point_x, point_y, radius=40, latitude=None, longitude=None, zoom=None):
+    """Process the image from step 1 with the selected point"""
     try:
         # If image_path is a URL, download it first
         if image_path.startswith('http'):
@@ -34,19 +34,22 @@ def step1_process_image_with_point(image_path, point_coords, radius=40):
         if image is None:
             return False, "Could not read the image"
         
-        cX, cY = point_coords
+        # Store circle data
+        circle_data = {
+            'cX': point_x,
+            'cY': point_y,
+            'radius': radius,
+            'latitude': latitude,
+            'longitude': longitude,
+            'zoom': zoom
+        }
         
-        # Save circle data for step 2
         with open('circle_data.json', 'w') as f:
-            json.dump({
-                'cX': int(cX),
-                'cY': int(cY),
-                'radius': radius  # Use the provided radius
-            }, f)
+            json.dump(circle_data, f)
         
         # Draw red circle around selected point
-        cv2.circle(image, (int(cX), int(cY)), radius, (0, 0, 255), 2)  # Draw circle with provided radius
-        cv2.circle(image, (int(cX), int(cY)), 5, (0, 0, 255), -1)  # Draw center point
+        cv2.circle(image, (point_x, point_y), radius, (0, 0, 255), 2)
+        cv2.circle(image, (point_x, point_y), 5, (0, 0, 255), -1)
         
         # Save processed image
         cv2.imwrite('images/step2_processed_image.jpg', image)
@@ -57,33 +60,39 @@ def step1_process_image_with_point(image_path, point_coords, radius=40):
         return False, f"Error processing image: {str(e)}"
 
 def process_step2():
+    """Process step 2 - Track the red dot"""
     try:
-        # Get radius size from request
-        radius_size = int(request.form.get('radiusSize', 40))  # Default to 40 if not provided
- 
-        # Get the image data from the form
-        image_path = None
-        
-        if 'image' in request.files and request.files['image'].filename:
-            # Handle file upload
-            file = request.files['image']
-            file.save('images/uploaded_image.jpg')
+        if request.method == 'POST':
+            # Get form data
+            point_x = int(request.form.get('pointX'))
+            point_y = int(request.form.get('pointY'))
+            radius = int(request.form.get('radiusSize', 40))
+            latitude = request.form.get('latitude')
+            longitude = request.form.get('longitude')
+            zoom = request.form.get('zoom')
+            
+            # Get the image file
+            image = request.files.get('image')
+            if not image:
+                return 'Error: No image provided'
+                
+            # Save uploaded image
             image_path = 'images/uploaded_image.jpg'
-        elif 'staticMapUrl' in request.form and request.form['staticMapUrl']:
-            # Handle static map URL
-            image_path = request.form['staticMapUrl']
+            image.save(image_path)
+            
+            # Process image with point
+            success, message = step1_process_image_with_point(
+                image_path, point_x, point_y, radius, 
+                latitude, longitude, zoom
+            )
+            
+            if success:
+                return 'success'
+            return message
+            
+        return 'Error: Invalid request method'
         
-        if not image_path:
-            return 'No image data provided'
-
-        point_x = int(request.form['pointX'])
-        point_y = int(request.form['pointY'])
-        
-        # Process image with point and radius
-        success, message = step1_process_image_with_point(image_path, (point_x, point_y), radius_size)
-        if success:
-            return 'success'
-        return message
     except Exception as e:
-        return f"Error processing upload: {str(e)}"
+        print(f"Error in process_step2: {str(e)}")
+        return str(e)
 

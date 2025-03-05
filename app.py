@@ -18,6 +18,7 @@ from steps.step5 import process_step5
 from steps.step6 import process_step6    
 from steps.step7 import process_step7
 from steps.step8 import process_step8
+from steps.step9 import process_step9, get_geojson
 
 import os
 from geojson import Feature, Polygon, FeatureCollection
@@ -142,6 +143,17 @@ def download_geojson():
                         download_name='field_boundary.geojson')
     except Exception as e:
         return str(e), 400
+
+@app.route('/get_geojson')
+def get_geojson_route():
+    try:
+        geojson_data = get_geojson()
+        if geojson_data:
+            return jsonify(geojson_data)
+        return 'Error: Could not read GeoJSON data', 500
+    except Exception as e:
+        print(f"Error getting GeoJSON: {str(e)}")
+        return str(e), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
