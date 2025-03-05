@@ -27,6 +27,11 @@ function moveToNextStep(nextStepId) {
     const nextStep = document.getElementById(nextStepId);
     if (nextStep) {
         nextStep.classList.remove('hidden');
+        // Enable both Next Step and Run All Steps buttons
+        const nextButton = document.getElementById(`${nextStepId}Next`);
+        const runAllButton = document.getElementById(`${nextStepId}RunAll`);
+        if (nextButton) nextButton.disabled = false;
+        if (runAllButton) runAllButton.disabled = false;
     }
     
     setCurrentStep(nextStepId);
@@ -68,6 +73,9 @@ function updateStepImages(resultImgElement, imagePath, useOverlay = false) {
  */
 function enableAllButtons() {
     document.querySelectorAll('.next-button').forEach(button => {
+        button.disabled = false;
+    });
+    document.querySelectorAll('.run-all-button').forEach(button => {
         button.disabled = false;
     });
 }
@@ -336,17 +344,31 @@ function processStep0() {
 // ============= PROCESSING STEPS =============
 
 /**
- * Process all steps automatically
+ * Process all steps automatically from the specified step onward
  */
-async function processAllSteps() {
+async function processAllSteps(event) {
     try {
-        await processStep2();
-        await processStep3();
-        await processStep4();
-        await processStep5();
-        await processStep6();
-        await processStep7();
-        await processStep8();
+        // Get the current step number from the clicked button's ID
+        const buttonId = event.target.id;
+        const stepNumber = parseInt(buttonId.match(/step(\d+)/)[1]);
+        
+        // Map of step numbers to their processing functions
+        const stepFunctions = {
+            2: processStep2,
+            3: processStep3,
+            4: processStep4,
+            5: processStep5,
+            6: processStep6,
+            7: processStep7,
+            8: processStep8
+        };
+        
+        // Process all steps from current step onward
+        for (let i = stepNumber; i <= 8; i++) {
+            if (stepFunctions[i]) {
+                await stepFunctions[i]();
+            }
+        }
         
         enableAllButtons();
         document.getElementById('step8').scrollIntoView({ behavior: 'smooth' });
