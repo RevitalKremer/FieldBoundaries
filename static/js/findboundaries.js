@@ -234,6 +234,57 @@ function clearMapMarker() {
 }
 
 /**
+ * Map Step -> Step 1: Handles successful image load from capture
+ * Processes captured image and enables Step 1
+ */
+function handleImageLoad(selectedLat, selectedLng, lat, lng, zoom, radius = 50) {
+    // Copy coordinates to Step 1
+    const step1Lat = document.getElementById('step1-latitude');
+    const step1Lng = document.getElementById('step1-longitude');
+    
+    step1Lat.value = selectedLat;
+    step1Lng.value = selectedLng;
+    step1Lat.disabled = true;  // Disable coordinate inputs for captured image
+    step1Lng.disabled = true;
+    
+    // Calculate point position using fixed dimensions
+    const imageWidth = 640;
+    const imageHeight = 640;
+    const centerPoint = project(parseFloat(selectedLat), parseFloat(selectedLng), zoom);
+    const imageCenter = project(lat, lng, zoom);
+    
+    const offsetX = (centerPoint.x - imageCenter.x) * 256 * Math.pow(2, zoom);
+    const offsetY = (centerPoint.y - imageCenter.y) * 256 * Math.pow(2, zoom);
+    
+    const pointX = (imageWidth / 2) + offsetX;
+    const pointY = (imageHeight / 2) + offsetY;
+    
+    // Update UI for captured image path
+    document.querySelector('.captured-image-section').style.backgroundColor = '#e8f5e9';
+    document.querySelector('.upload-section').style.opacity = '0.5';
+    document.getElementById('imageInput').disabled = true;
+    
+    // Update point marker using fixed dimensions
+    document.getElementById('pointX').value = Math.round(pointX);
+    document.getElementById('pointY').value = Math.round(pointY);
+    
+    const marker = document.getElementById('pointMarker');
+    marker.style.left = pointX + 'px';
+    marker.style.top = pointY + 'px';
+    marker.style.display = 'block';
+
+    // Set initial radius size
+    const radiusSlider = document.getElementById('radiusSize');
+    if (radiusSlider) {
+        radiusSlider.value = radius;
+        document.getElementById('radiusSizeValue').textContent = radius + 'px';
+    }
+    
+    showAndEnableStep('step1');
+    clearMapMarker();
+}
+
+/**
  * Map Step: Process step 0 - Capture the map area
  * Creates static map image from selected location
  */
@@ -253,6 +304,9 @@ function processStep0() {
     const lng = center.lng();
     const zoom = map.getZoom();
 
+    // Get initial radius size
+    const radiusSize = document.getElementById('radiusSize')?.value || 50;
+
     // Create URL for static map
     const width = 640;
     const height = 640;
@@ -265,7 +319,7 @@ function processStep0() {
     
     img.onload = function() {
         console.log('Image loaded successfully');
-        handleImageLoad(selectedLat, selectedLng, lat, lng, zoom);
+        handleImageLoad(selectedLat, selectedLng, lat, lng, zoom, radiusSize);
     };
 
     img.onerror = function() {
@@ -353,50 +407,6 @@ function setupControlHandlers() {
 }
 
 // ============= STEP 1 FUNCTIONS =============
-
-/**
- * Map Step -> Step 1: Handles successful image load from capture
- * Processes captured image and enables Step 1
- */
-function handleImageLoad(selectedLat, selectedLng, lat, lng, zoom) {
-    // Copy coordinates to Step 1
-    const step1Lat = document.getElementById('step1-latitude');
-    const step1Lng = document.getElementById('step1-longitude');
-    
-    step1Lat.value = selectedLat;
-    step1Lng.value = selectedLng;
-    step1Lat.disabled = true;  // Disable coordinate inputs for captured image
-    step1Lng.disabled = true;
-    
-    // Calculate point position using fixed dimensions
-    const imageWidth = 640;
-    const imageHeight = 640;
-    const centerPoint = project(parseFloat(selectedLat), parseFloat(selectedLng), zoom);
-    const imageCenter = project(lat, lng, zoom);
-    
-    const offsetX = (centerPoint.x - imageCenter.x) * 256 * Math.pow(2, zoom);
-    const offsetY = (centerPoint.y - imageCenter.y) * 256 * Math.pow(2, zoom);
-    
-    const pointX = (imageWidth / 2) + offsetX;
-    const pointY = (imageHeight / 2) + offsetY;
-    
-    // Update UI for captured image path
-    document.querySelector('.captured-image-section').style.backgroundColor = '#e8f5e9';
-    document.querySelector('.upload-section').style.opacity = '0.5';
-    document.getElementById('imageInput').disabled = true;
-    
-    // Update point marker using fixed dimensions
-    document.getElementById('pointX').value = Math.round(pointX);
-    document.getElementById('pointY').value = Math.round(pointY);
-    
-    const marker = document.getElementById('pointMarker');
-    marker.style.left = pointX + 'px';
-    marker.style.top = pointY + 'px';
-    marker.style.display = 'block';
-    
-    showAndEnableStep('step1');
-    clearMapMarker();
-}
 
 /**
  * Step 1: Updates point marker on the captured image
@@ -540,45 +550,90 @@ function checkStep1Completion() {
 }
 
 /**
- * Step 2: Processes the initial image and point selection
- * Sends selected coordinates and image to server for processing
+ * Step 2: Process initial image with given radius size
+ * Processes the initial image and point selection
  */
-async function processStep2() {
+async function processStep2WithRadius() {
     try {
-        const formData = new FormData();
-        const previewImage = document.getElementById('previewImage');
+        const radiusSlider = document.getElementById('radiusSize');
+        if (!radiusSlider) return false;
+
+        const radiusSize = radiusSlider.value;
+        document.getElementById('step2Status').textContent = 'Processing...';
         
-        // Convert the preview image to a blob
+        const formData = new FormData();
+        
+        // Get point coordinates
+        const pointX = document.getElementById('pointX').value;
+        const pointY = document.getElementById('pointY').value;
+        const latitude = document.getElementById('step1-latitude').value;
+        const longitude = document.getElementById('step1-longitude').value;
+        
+        if (!pointX || !pointY) {
+            document.getElementById('uploadStatus').textContent = 'Error: Point coordinates not found';
+            return false;
+        }
+
+        // Get the preview image - use existing image without re-fetching
+        const previewImage = document.getElementById('previewImage');
         const response = await fetch(previewImage.src);
         const blob = await response.blob();
         formData.append('image', blob, 'preview_image.jpg');
         
-        // Add other necessary data
-        formData.append('pointX', document.getElementById('pointX').value);
-        formData.append('pointY', document.getElementById('pointY').value);
-        formData.append('latitude', document.getElementById('step1-latitude').value);
-        formData.append('longitude', document.getElementById('step1-longitude').value);
-        formData.append('radiusSize', '1'); //tbd revital
+        // Add form data
+        formData.append('pointX', Math.round(parseFloat(pointX)));
+        formData.append('pointY', Math.round(parseFloat(pointY)));
+        formData.append('latitude', latitude);
+        formData.append('longitude', longitude);
+        formData.append('radiusSize', radiusSize);
 
-        document.getElementById('uploadStatus').textContent = 'Processing step 2...';
         const result = await fetch('/process_step2', {
             method: 'POST',
             body: formData
         }).then(response => response.text());
         
-        if (result !== 'success') {
-            throw new Error('Step 1 failed: ' + result);
+        if (result === 'success') {
+            updateStepImages(document.getElementById('processedImage'), 'step2_processed_image.jpg');
+            document.getElementById('step2Status').textContent = `Processing complete! (Radius size: ${radiusSize}px)`;
+            document.getElementById('step2Next').disabled = false;
+            return true;
+        } else {
+            throw new Error(result);
         }
-        
-        updateStepImages(document.getElementById('processedImage'), 'step2_processed_image.jpg');
-        document.getElementById('step2Status').textContent = 'Processing complete!';
-        document.getElementById('step2Next').disabled = false;
-        moveToNextStep('step2');
     } catch (error) {
-        showErrorPopup('Step 1', error);
-        document.getElementById('uploadStatus').textContent = 'Error: ' + error.message;
+        console.error('Error:', error);
+        document.getElementById('step2Status').textContent = 'Error: ' + error.message;
+        return false;
     }
 }
+
+/**
+ * Step 2: Processes the initial image and point selection
+ * Sends selected coordinates and image to server for processing
+ */
+async function processStep2() {
+    const success = await processStep2WithRadius();
+    if (success) {
+        moveToNextStep('step2');
+    }
+}
+
+/**
+ * Setup radius control
+ */
+function setupRadiusControl() {
+    const radiusSlider = document.getElementById('radiusSize');
+    if (!radiusSlider) return;
+
+    // Update value display
+    radiusSlider.oninput = function() {
+        document.getElementById('radiusSizeValue').textContent = this.value + 'px';
+    };
+
+    // Apply button handler
+    document.getElementById('applyRadiusSize').onclick = processStep2WithRadius;
+}
+
 
 // ============= STEP 3 FUNCTIONS =============
 
@@ -604,30 +659,69 @@ async function processStep3() {
 // ============= STEPS 4 FUNCTIONS =============
 
 /**
+ * Step 4: Process pixel density with given window size
+ * Creates black mask based on pixel density analysis
+ */
+async function processStep4WithWindowSize() {
+    try {
+        const windowSlider = document.getElementById('windowSize');
+        if (!windowSlider) return false;
+        
+        const windowSize = windowSlider.value;
+        document.getElementById('step4Status').textContent = 'Processing...';
+        document.getElementById('step4Next').disabled = true;
+        
+        const formData = new FormData();
+        formData.append('windowSize', windowSize);
+        
+        const response = await fetch('/process_step4', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await response.text();
+        
+        if (result === 'success') {
+            updateStepImages(document.getElementById('densityMaskImage'), 'step4_density_mask.jpg');
+            document.getElementById('step4Status').textContent = `Processing complete! (Window size: ${windowSize}px)`;
+            document.getElementById('step4Next').disabled = false;
+            return true;
+        } else {
+            throw new Error(result);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        document.getElementById('step4Status').textContent = 'Error: ' + error.message;
+        return false;
+    }
+}
+
+/**
  * Step 4: Process pixel density
  * Creates black mask based on pixel density analysis
  */
 async function processStep4() {
-    try {
-        const formData = new FormData();
-        formData.append('windowSize', '1');
-        
-        const result = await fetch('/process_step4', {
-            method: 'POST',
-            body: formData
-        }).then(response => response.text());
-        
-        if (result !== 'success') throw new Error('Step 4 failed');
-
-        updateStepImages(document.getElementById('densityMaskImage'), 'step4_density_mask.jpg');
-        document.getElementById('step4Status').textContent = 'Processing complete!';
-        document.getElementById('step4Next').disabled = false;
+    const success = await processStep4WithWindowSize();
+    if (success) {
         moveToNextStep('step4');
-    } catch (error) {
-        showErrorPopup('Step 4', error);
-        document.getElementById('step4Status').textContent = 'Error: ' + error.message;
     }
 }
+
+/**
+ * Setup window size control
+ */
+function setupWindowSizeControl() {
+    const windowSlider = document.getElementById('windowSize');
+    if (!windowSlider) return;
+
+    // Update value display
+    windowSlider.oninput = function() {
+        document.getElementById('windowSizeValue').textContent = this.value + 'px';
+    };
+
+    // Apply button handler
+    document.getElementById('applyWindowSize').onclick = processStep4WithWindowSize;
+}
+
 
 // ============= STEP 5 FUNCTIONS =============
 /**
@@ -652,29 +746,70 @@ async function processStep5() {
 // ============= STEP 6 FUNCTIONS =============
 
 /**
+ * Step 6: Process edge smoothing with given epsilon factor
+ * Smooths the edges of the identified field shape
+ */
+async function processStep6WithEpsilon() {
+    try {
+        const epsilonSlider = document.getElementById('epsilonFactor');
+        if (!epsilonSlider) return false;
+        
+        const epsilonFactor = epsilonSlider.value;
+        document.getElementById('step6Status').textContent = 'Processing...';
+        document.getElementById('step6Next').disabled = true;
+        
+        const formData = new FormData();
+        formData.append('epsilonFactor', epsilonFactor);
+        
+        const response = await fetch('/process_step6', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await response.text();
+        
+        if (result === 'success') {
+            updateStepImages(document.getElementById('smoothedShapeImage'), 'step6_smoothed_shape.jpg');
+            document.getElementById('step6Status').textContent = `Processing complete! (Smoothing: ${parseFloat(epsilonFactor).toFixed(4)})`;
+            document.getElementById('step6Next').disabled = false;
+            return true;
+        } else {
+            throw new Error(result);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        document.getElementById('step6Status').textContent = 'Error: ' + error.message;
+        return false;
+    }
+}
+
+/**
  * Step 6: Applies edge smoothing
  * Smooths the edges of the identified field shape
  */
 async function processStep6() {
-    try {
-        const formData = new FormData();
-        formData.append('epsilonFactor', '0.01');
-        
-        const result = await fetch('/process_step6', {
-            method: 'POST',
-            body: formData
-        }).then(response => response.text());
-        if (result !== 'success') throw new Error('Step 6 failed');
-        
-        updateStepImages(document.getElementById('smoothedShapeImage'), 'step6_smoothed_shape.jpg');
-        document.getElementById('step6Status').textContent = 'Processing complete!';
-        document.getElementById('step6Next').disabled = false;
+    const success = await processStep6WithEpsilon();
+    if (success) {
         moveToNextStep('step6');
-    } catch (error) {
-        showErrorPopup('Step 6', error);
-        document.getElementById('step5Status').textContent = 'Error: ' + error.message;
     }
 }
+
+/**
+ * Setup epsilon control
+ */
+function setupEpsilonControl() {
+    const epsilonSlider = document.getElementById('epsilonFactor');
+    if (!epsilonSlider) return;
+
+    // Update value display
+    epsilonSlider.oninput = function() {
+        const value = parseFloat(this.value).toFixed(4);
+        document.getElementById('epsilonValue').textContent = value;
+    };
+
+    // Apply button handler
+    document.getElementById('applySmoothing').onclick = processStep6WithEpsilon;
+}
+
 
 // ============= STEP 7 FUNCTIONS =============
 
@@ -716,148 +851,4 @@ async function processStep8() {
         showErrorPopup('Step 8', error);
         document.getElementById('step7Status').textContent = 'Error: ' + error.message;
     }
-}
-
-// ============= CONTROL FUNCTIONS =============
-
-/**
- * Setup radius control
- */
-function setupRadiusControl() {
-    const radiusSlider = document.getElementById('radiusSize');
-    if (!radiusSlider) return;
-
-    // Update value display
-    radiusSlider.oninput = function() {
-        document.getElementById('radiusSizeValue').textContent = this.value + 'px';
-    };
-
-    // Apply button handler
-    document.getElementById('applyRadiusSize').onclick = async function() {
-        const radiusSize = radiusSlider.value;
-        document.getElementById('step2Status').textContent = 'Processing...';
-        
-        const formData = new FormData();
-        
-        // Get point coordinates
-        const pointX = document.getElementById('pointX').value;
-        const pointY = document.getElementById('pointY').value;
-        
-        if (!pointX || !pointY) {
-            document.getElementById('uploadStatus').textContent = 'Error: Point coordinates not found';
-            return;
-        }
-        
-        // Add form data
-        formData.append('staticMapUrl', document.getElementById('previewImage').src);
-        formData.append('pointX', Math.round(parseFloat(pointX)));
-        formData.append('pointY', Math.round(parseFloat(pointY)));
-        formData.append('latitude', document.querySelector('#step1 input[name="latitude"]').value);
-        formData.append('longitude', document.querySelector('#step1 input[name="longitude"]').value);
-        formData.append('radiusSize', radiusSize);
-
-        try {
-            const response = await fetch('/process_step2', {
-                method: 'POST',
-                body: formData
-            });
-            const result = await response.text();
-            
-            if (result === 'success') {
-                updateStepImages(document.getElementById('processedImage'), 'step2_processed_image.jpg');
-                document.getElementById('step2Status').textContent = `Processing complete! (Radius size: ${radiusSize}px)`;
-                document.getElementById('step2Next').disabled = false;
-            } else {
-                document.getElementById('step2Status').textContent = 'Error: ' + result;
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            document.getElementById('step2Status').textContent = 'Error: ' + error.message;
-        }
-    };
-}
-
-/**
- * Setup window size control
- */
-function setupWindowSizeControl() {
-    const windowSlider = document.getElementById('windowSize');
-    if (!windowSlider) return;
-
-    // Update value display
-    windowSlider.oninput = function() {
-        document.getElementById('windowSizeValue').textContent = this.value + 'px';
-    };
-
-    // Apply button handler
-    document.getElementById('applyWindowSize').onclick = async function() {
-        try {
-            const windowSize = windowSlider.value;
-            document.getElementById('step4Status').textContent = 'Processing...';
-            document.getElementById('step4Next').disabled = true;
-            
-            const formData = new FormData();
-            formData.append('windowSize', windowSize);
-            
-            const response = await fetch('/process_step4', {
-                method: 'POST',
-                body: formData
-            });
-            const result = await response.text();
-            
-            if (result === 'success') {
-                updateStepImages(document.getElementById('densityMaskImage'), 'step4_density_mask.jpg');
-                document.getElementById('step4Status').textContent = `Processing complete! (Window size: ${windowSize}px)`;
-                document.getElementById('step4Next').disabled = false;
-            } else {
-                throw new Error(result);
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            document.getElementById('step4Status').textContent = 'Error: ' + error.message;
-        }
-    };
-}
-
-/**
- * Setup epsilon control
- */
-function setupEpsilonControl() {
-    const epsilonSlider = document.getElementById('epsilonFactor');
-    if (!epsilonSlider) return;
-
-    // Update value display
-    epsilonSlider.oninput = function() {
-        const value = parseFloat(this.value).toFixed(4);
-        document.getElementById('epsilonValue').textContent = value;
-    };
-
-    // Apply button handler
-    document.getElementById('applySmoothing').onclick = async function() {
-        try {
-            const epsilonFactor = epsilonSlider.value;
-            document.getElementById('step6Status').textContent = 'Processing...';
-            document.getElementById('step6Next').disabled = true;
-            
-            const formData = new FormData();
-            formData.append('epsilonFactor', epsilonFactor);
-            
-            const response = await fetch('/process_step6', {
-                method: 'POST',
-                body: formData
-            });
-            const result = await response.text();
-            
-            if (result === 'success') {
-                updateStepImages(document.getElementById('smoothedShapeImage'), 'step6_smoothed_shape.jpg');
-                document.getElementById('step6Status').textContent = `Processing complete! (Smoothing: ${parseFloat(epsilonFactor).toFixed(4)})`;
-                document.getElementById('step6Next').disabled = false;
-            } else {
-                throw new Error(result);
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            document.getElementById('step6Status').textContent = 'Error: ' + error.message;
-        }
-    };
 } 

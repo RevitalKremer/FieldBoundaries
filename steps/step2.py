@@ -20,7 +20,7 @@ def download_image_from_url(url):
         return False
 
 
-def step1_process_image_with_point(image_path, point_coords):
+def step1_process_image_with_point(image_path, point_coords, radius=40):
     """Process image to draw circle around selected point"""
     try:
         # If image_path is a URL, download it first
@@ -41,11 +41,11 @@ def step1_process_image_with_point(image_path, point_coords):
             json.dump({
                 'cX': int(cX),
                 'cY': int(cY),
-                'radius': 40  # Fixed radius for the circle
+                'radius': radius  # Use the provided radius
             }, f)
         
         # Draw red circle around selected point
-        cv2.circle(image, (int(cX), int(cY)), 40, (0, 0, 255), 2)  # Draw circle
+        cv2.circle(image, (int(cX), int(cY)), radius, (0, 0, 255), 2)  # Draw circle with provided radius
         cv2.circle(image, (int(cX), int(cY)), 5, (0, 0, 255), -1)  # Draw center point
         
         # Save processed image
@@ -58,8 +58,8 @@ def step1_process_image_with_point(image_path, point_coords):
 
 def process_step2():
     try:
-       # Get window size from request
-        radius_size = int(request.form.get('radiusSize', 5))
+        # Get radius size from request
+        radius_size = int(request.form.get('radiusSize', 40))  # Default to 40 if not provided
  
         # Get the image data from the form
         image_path = None
@@ -79,8 +79,8 @@ def process_step2():
         point_x = int(request.form['pointX'])
         point_y = int(request.form['pointY'])
         
-        # Process image with point
-        success, message = step1_process_image_with_point(image_path, (point_x, point_y))
+        # Process image with point and radius
+        success, message = step1_process_image_with_point(image_path, (point_x, point_y), radius_size)
         if success:
             return 'success'
         return message
