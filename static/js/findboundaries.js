@@ -233,6 +233,52 @@ function clearMapMarker() {
     }
 }
 
+/**
+ * Map Step: Process step 0 - Capture the map area
+ * Creates static map image from selected location
+ */
+function processStep0() {
+    // Check if coordinates are selected
+    const selectedLat = document.getElementById('latitude').value;
+    const selectedLng = document.getElementById('longitude').value;
+
+    if (!selectedLat || !selectedLng) {
+        alert('Please select a point on the map first');
+        return;
+    }
+
+    // Get center coordinates and zoom
+    const center = map.getCenter();
+    const lat = center.lat();
+    const lng = center.lng();
+    const zoom = map.getZoom();
+
+    // Create URL for static map
+    const width = 640;
+    const height = 640;
+    const url = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${width}x${height}&maptype=satellite&key=${googleMapsApiKey}`;
+
+    // Create an image element and set its source
+    const img = document.getElementById('previewImage');
+    
+    console.log('Loading image:', url);
+    
+    img.onload = function() {
+        console.log('Image loaded successfully');
+        handleImageLoad(selectedLat, selectedLng, lat, lng, zoom);
+    };
+
+    img.onerror = function() {
+        console.error('Failed to load image');
+        alert('Failed to capture the area. Please try again.');
+    };
+
+    img.src = url;
+    img.style.display = 'block';
+    
+    console.log('Capture process initiated');
+}
+
 // ============= PROCESSING STEPS =============
 
 /**
