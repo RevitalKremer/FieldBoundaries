@@ -35,7 +35,40 @@ function moveToNextStep(nextStepId) {
     }
     
     setCurrentStep(nextStepId);
-    document.getElementById(nextStepId).scrollIntoView({ behavior: 'smooth' });
+    
+    // Wait for all images in the step to load before scrolling
+    const images = nextStep.getElementsByTagName('img');
+    if (images.length > 0) {
+        let loadedImages = 0;
+        const totalImages = images.length;
+        
+        const scrollAfterLoad = () => {
+            loadedImages++;
+            if (loadedImages === totalImages) {
+                // All images loaded, now scroll
+                const rect = nextStep.getBoundingClientRect();
+                const viewportHeight = window.innerHeight;
+                
+                if (rect.height < viewportHeight) {
+                    nextStep.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                    nextStep.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+        };
+
+        Array.from(images).forEach(img => {
+            if (img.complete) {
+                scrollAfterLoad();
+            } else {
+                img.onload = scrollAfterLoad;
+                img.onerror = scrollAfterLoad; // Count errors too to avoid hanging
+            }
+        });
+    } else {
+        // No images, scroll immediately
+        nextStep.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 }
 
 /**
@@ -371,7 +404,43 @@ async function processAllSteps(event) {
         }
         
         enableAllButtons();
-        document.getElementById('step8').scrollIntoView({ behavior: 'smooth' });
+        
+        // Wait for all images in the last step to load before scrolling
+        const lastStep = document.getElementById(`step${Math.min(8, stepNumber + 1)}`);
+        if (lastStep) {
+            const images = lastStep.getElementsByTagName('img');
+            if (images.length > 0) {
+                let loadedImages = 0;
+                const totalImages = images.length;
+                
+                const scrollAfterLoad = () => {
+                    loadedImages++;
+                    if (loadedImages === totalImages) {
+                        // All images loaded, now scroll
+                        const rect = lastStep.getBoundingClientRect();
+                        const viewportHeight = window.innerHeight;
+                        
+                        if (rect.height < viewportHeight) {
+                            lastStep.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        } else {
+                            lastStep.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    }
+                };
+
+                Array.from(images).forEach(img => {
+                    if (img.complete) {
+                        scrollAfterLoad();
+                    } else {
+                        img.onload = scrollAfterLoad;
+                        img.onerror = scrollAfterLoad; // Count errors too to avoid hanging
+                    }
+                });
+            } else {
+                // No images, scroll immediately
+                lastStep.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
         
     } catch (error) {
         showErrorPopup('Automatic Processing', error);
@@ -462,7 +531,7 @@ function showAndEnableStep(stepName) {
     
     document.getElementById('uploadStatus').textContent = 'Point selected. Click "Next Step" to continue or "Run All Steps" to process automatically.';
     
-    step.scrollIntoView({ behavior: 'smooth' });
+    step.scrollIntoView({ behavior: 'smooth', block: 'end' });
     setCurrentStep(stepName);  // Set next step as current
 }
 
