@@ -20,7 +20,7 @@ def download_image_from_url(url):
         return False
 
 
-def step1_process_image_with_point(image_path, point_x, point_y, radius=40, latitude=None, longitude=None, zoom=None):
+def step1_process_image_with_point(image_path, point_x, point_y, radius=40, latitude=None, longitude=None, zoom=None, map_bounds=None, map_center=None):
     """Process the image from step 1 with the selected point"""
     try:
         # If image_path is a URL, download it first
@@ -41,7 +41,9 @@ def step1_process_image_with_point(image_path, point_x, point_y, radius=40, lati
             'radius': radius,
             'latitude': latitude,
             'longitude': longitude,
-            'zoom': zoom
+            'zoom': zoom,
+            'bounds': map_bounds,
+            'center': map_center
         }
         
         with open('circle_data.json', 'w') as f:
@@ -70,6 +72,16 @@ def process_step2():
             latitude = request.form.get('latitude')
             longitude = request.form.get('longitude')
             zoom = request.form.get('zoom')
+            map_bounds = {
+                'north': float(request.form.get('bounds[north]')),
+                'south': float(request.form.get('bounds[south]')),
+                'east': float(request.form.get('bounds[east]')),
+                'west': float(request.form.get('bounds[west]'))
+            }
+            map_center = {
+                'lat': float(request.form.get('center[lat]')),
+                'lng': float(request.form.get('center[lng]'))
+            }
             
             # Get the image file
             image = request.files.get('image')
@@ -83,7 +95,7 @@ def process_step2():
             # Process image with point
             success, message = step1_process_image_with_point(
                 image_path, point_x, point_y, radius, 
-                latitude, longitude, zoom
+                latitude, longitude, zoom, map_bounds, map_center
             )
             
             if success:

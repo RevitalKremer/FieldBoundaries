@@ -145,15 +145,13 @@ def download_geojson():
         return str(e), 400
 
 @app.route('/get_geojson')
-def get_geojson_route():
+def get_geojson():
     try:
-        geojson_data = get_geojson()
-        if geojson_data:
-            return jsonify(geojson_data)
-        return 'Error: Could not read GeoJSON data', 500
+        with open('step9_geojson.json', 'r') as f:
+            geojson = json.load(f)
+        return jsonify(geojson)
     except Exception as e:
-        print(f"Error getting GeoJSON: {str(e)}")
-        return str(e), 500
+        return jsonify({'error': str(e)})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)

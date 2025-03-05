@@ -681,6 +681,18 @@ async function processStep2WithRadius() {
         formData.append('zoom', zoom);
         formData.append('radiusSize', radiusSize);
 
+        // Add map bounds
+        const bounds = map.getBounds().toJSON();
+        formData.append('bounds[north]', bounds.north);
+        formData.append('bounds[south]', bounds.south);
+        formData.append('bounds[east]', bounds.east);
+        formData.append('bounds[west]', bounds.west);
+
+        // Add map center
+        const center = map.getCenter();
+        formData.append('center[lat]', center.lat());
+        formData.append('center[lng]', center.lng());
+
         const result = await fetch('/process_step2', {
             method: 'POST',
             body: formData
@@ -962,65 +974,112 @@ async function processStep9() {
             throw new Error(result);
         }
 
-        // Get the original coordinates
+        // Get the exact properties from the initial map
         const selectedLat = parseFloat(document.getElementById('step1-latitude').value);
         const selectedLng = parseFloat(document.getElementById('step1-longitude').value);
-        const originalZoom = parseInt(document.getElementById('zoomSlider').value);
+        const initialZoom = map.getZoom();
+        const initialBounds = map.getBounds().toJSON();
+        const initialCenter = map.getCenter();
 
-        // Initialize the result map
+        console.log('Initial map properties:', {
+            zoom: initialZoom,
+            center: { lat: initialCenter.lat(), lng: initialCenter.lng() },
+            bounds: initialBounds,
+            selectedPoint: { lat: selectedLat, lng: selectedLng }
+        });
+
+        // Initialize the result map with exact same properties as initial map
         const resultMap = new google.maps.Map(document.getElementById('resultMap'), {
-            center: { lat: selectedLat, lng: selectedLng },
-            zoom: originalZoom,
+            zoom: initialZoom,  // Set zoom first
+            center: { lat: initialCenter.lat(), lng: initialCenter.lng() },  // Use exact center
             mapTypeId: 'satellite',
             streetViewControl: false,
             fullscreenControl: false
         });
 
-        // Add marker for the selected point
-        const marker = new google.maps.Marker({
-            position: { lat: selectedLat, lng: selectedLng },
-            map: resultMap,
-            icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                fillColor: '#FF0000',
-                fillOpacity: 1.0,
-                strokeColor: '#FFFFFF',
-                strokeWeight: 2,
-                scale: 8
-            }
+        // Wait for the map to be idle before setting bounds and adding features
+        google.maps.event.addListenerOnce(resultMap, 'idle', async () => {
+            // Set the exact same bounds
+            const latLngBounds = new google.maps.LatLngBounds(
+                { lat: initialBounds.south, lng: initialBounds.west },
+                { lat: initialBounds.north, lng: initialBounds.east }
+            );
+            resultMap.fitBounds(latLngBounds);
+
+            // Force the exact zoom level after bounds are set
+            google.maps.event.addListenerOnce(resultMap, 'bounds_changed', () => {
+                resultMap.setZoom(initialZoom);
+                resultMap.setCenter({ lat: initialCenter.lat(), lng: initialCenter.lng() });
+            });
+
+            // Add marker for the selected point at exact same position
+            new google.maps.Marker({
+                position: { lat: selectedLat, lng: selectedLng },
+                map: resultMap,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    fillColor: '#FF0000',
+                    fillOpacity: 1.0,
+                    strokeColor: '#FFFFFF',
+                    strokeWeight: 2,
+                    scale: 8
+                }
+            });
+
+            // Fetch and add the GeoJSON data after map is properly initialized
+            const geojsonResponse = await fetch('/download_geojson');
+            const geojsonData = await geojsonResponse.json();
+            
+            resultMap.data.addGeoJson(geojsonData);
+            resultMap.data.setStyle({
+                fillColor: '#00BCD4',
+                fillOpacity: 0.3,
+                strokeColor: '#00BCD4',
+                strokeWeight: 2
+            });
+
+            console.log('Result map properties:', {
+                zoom: resultMap.getZoom(),
+                center: resultMap.getCenter().toJSON(),
+                bounds: resultMap.getBounds().toJSON(),
+                selectedPoint: { lat: selectedLat, lng: selectedLng }
+            });
+
+            // Log GeoJSON data for debugging
+            console.log('GeoJSON data:', geojsonData);
         });
 
-        // Fetch and display the GeoJSON data
-        const geojsonResponse = await fetch('/get_geojson');
-        const geojsonData = await geojsonResponse.json();
-        console.log('GeoJSON data:', geojsonData); // Debug log
-
-        // Add the GeoJSON to the map
-        resultMap.data.addGeoJson(geojsonData);
-        resultMap.data.setStyle({
-            fillColor: '#00BCD4',
-            fillOpacity: 0.3,
-            strokeColor: '#00BCD4',
-            strokeWeight: 2
-        });
-
-        // Set up zoom slider
+        // Set up zoom slider to match initial map
         const zoomSlider = document.getElementById('resultZoomSlider');
         const zoomLevel = document.getElementById('resultZoomLevel');
         
-        zoomSlider.value = originalZoom;
-        zoomLevel.textContent = originalZoom;
+        // Initialize zoom controls with exact same zoom
+        zoomSlider.value = initialZoom;
+        zoomLevel.textContent = initialZoom;
         
+        // Ensure zoom controls maintain synchronization
         zoomSlider.addEventListener('input', () => {
             const zoom = parseInt(zoomSlider.value);
             resultMap.setZoom(zoom);
             zoomLevel.textContent = zoom;
+            
+            // Keep the center point when zooming
+            resultMap.setCenter({ lat: initialCenter.lat(), lng: initialCenter.lng() });
         });
 
         resultMap.addListener('zoom_changed', () => {
             const zoom = resultMap.getZoom();
             zoomSlider.value = zoom;
             zoomLevel.textContent = zoom;
+        });
+
+        // Add center_changed listener to maintain the center point
+        resultMap.addListener('center_changed', () => {
+            const currentCenter = resultMap.getCenter();
+            if (currentCenter.lat() !== initialCenter.lat() || 
+                currentCenter.lng() !== initialCenter.lng()) {
+                resultMap.setCenter({ lat: initialCenter.lat(), lng: initialCenter.lng() });
+            }
         });
 
         document.getElementById('step9Status').textContent = 'Field boundary displayed on map';
