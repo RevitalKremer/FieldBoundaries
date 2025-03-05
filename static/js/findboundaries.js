@@ -1,26 +1,19 @@
 // Global variables for tracking state across steps
-let selectedPoint = null;
 let map;
 let currentMarker = null;
-let currentStep = 'step0';  // Fix: Remove extra quote
+let currentStep = 'step0';
 
 // ============= UTILITY FUNCTIONS =============
 
 /**
  * Utility: Sets the current active step by adding/removing 'current' class
- * @param {string} stepId - The ID of the step to set as current ('step0', 'step1', etc.)
  */
 function setCurrentStep(stepId) {
-    // Update the current step variable
     currentStep = stepId;
     
-    // Remove 'current' class from all steps
     const allSteps = document.querySelectorAll('.step-row');
-    allSteps.forEach(step => {
-        step.classList.remove('current');
-    });
+    allSteps.forEach(step => step.classList.remove('current'));
     
-    // Add 'current' class to the specified step
     const currentStepElement = document.getElementById(stepId);
     if (currentStepElement) {
         currentStepElement.classList.add('current');
@@ -29,25 +22,19 @@ function setCurrentStep(stepId) {
 
 /**
  * Utility: Move to the next step
- * @param {string} nextStepId - The ID of the next step
  */
 function moveToNextStep(nextStepId) {
-    // Show the next step
     const nextStep = document.getElementById(nextStepId);
     if (nextStep) {
         nextStep.classList.remove('hidden');
     }
     
-    // Update current step
     setCurrentStep(nextStepId);
-    
-    // Scroll to the new step
     document.getElementById(nextStepId).scrollIntoView({ behavior: 'smooth' });
 }
 
 /**
  * Utility: Converts lat/lng to Mercator projection coordinates
- * Used for calculating point positions on static map
  */
 function project(lat, lng, zoom) {
     const siny = Math.sin((lat * Math.PI) / 180);
@@ -62,18 +49,12 @@ function project(lat, lng, zoom) {
 
 /**
  * Utility: Updates images for each step
- * Handles image updates with cache busting and optional overlay
  */
 function updateStepImages(resultImgElement, imagePath, useOverlay = false) {
-    // Add cache-busting timestamp
     const timestamp = new Date().getTime();
-    
-    // Keep the original path structure (/display/ or direct path)
-    if (imagePath.startsWith('/display/')) {
-        resultImgElement.src = imagePath + '?' + timestamp;
-    } else {
-        resultImgElement.src = '/display/' + imagePath + '?' + timestamp;
-    }
+    resultImgElement.src = imagePath.startsWith('/display/') ? 
+        imagePath + '?' + timestamp : 
+        '/display/' + imagePath + '?' + timestamp;
     
     if (useOverlay) {
         const container = resultImgElement.parentElement.parentElement;
@@ -84,30 +65,25 @@ function updateStepImages(resultImgElement, imagePath, useOverlay = false) {
 
 /**
  * Utility: Enables all step buttons
- * Used after automatic processing to ensure all steps are accessible
  */
 function enableAllButtons() {
     document.querySelectorAll('.next-button').forEach(button => {
         button.disabled = false;
     });
-    
 }
 
 /**
  * Utility: Shows error popup and logs error
- * @param {string} stepName - The name of the step that failed
- * @param {Error} error - The error object
  */
 function showErrorPopup(stepName, error) {
     console.error(`Error in ${stepName}:`, error);
     alert(`Error in ${stepName}: ${error.message}`);
 }
 
-// ============= MAP STEP FUNCTIONS =============
+// ============= MAP FUNCTIONS =============
 
 /**
- * Map Step: Initializes the Google Map with satellite view
- * Sets up initial map position, zoom level, and map type
+ * Map: Initializes the Google Map
  */
 function initMap() {
     try {
@@ -120,7 +96,7 @@ function initMap() {
 
         setupMapControls();
         setupMapEventListeners();
-        setCurrentStep('step0');  // Set map step as current initially
+        setCurrentStep('step0');
         
     } catch (error) {
         handleMapInitError(error);
@@ -255,6 +231,79 @@ function clearMapMarker() {
         currentMarker.setMap(null);
         currentMarker = null;
     }
+}
+
+// ============= PROCESSING STEPS =============
+
+/**
+ * Process all steps automatically
+ */
+async function processAllSteps() {
+    try {
+        await processStep2();
+        await processStep3();
+        await processStep4();
+        await processStep5();
+        await processStep6();
+        await processStep7();
+        await processStep8();
+        
+        enableAllButtons();
+        document.getElementById('step8').scrollIntoView({ behavior: 'smooth' });
+        
+    } catch (error) {
+        showErrorPopup('Automatic Processing', error);
+    }
+}
+
+// ============= EVENT LISTENERS =============
+
+document.addEventListener('DOMContentLoaded', function() {
+    setCurrentStep('step0');
+
+    // Add Enter key handler
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            const currentStep = document.querySelector('.step-row.current');
+            if (currentStep) {
+                const nextButton = currentStep.querySelector('.next-button:not(.run-all-button):not(.control-button)');
+                if (nextButton && !nextButton.disabled) {
+                    event.preventDefault();
+                    nextButton.click();
+                }
+            }
+        }
+    });
+
+    // Setup input handlers
+    setupInputHandlers();
+    
+    // Setup control handlers
+    setupControlHandlers();
+});
+
+/**
+ * Setup all input handlers
+ */
+function setupInputHandlers() {
+    const imageInput = document.getElementById('imageInput');
+    const previewImage = document.getElementById('previewImage');
+    const step1Lat = document.getElementById('step1-latitude');
+    const step1Lng = document.getElementById('step1-longitude');
+    
+    if (imageInput) imageInput.onchange = handleImageInput;
+    if (previewImage) previewImage.onclick = handlePreviewImageClick;
+    if (step1Lat) step1Lat.oninput = handleCoordinateInput;
+    if (step1Lng) step1Lng.oninput = handleCoordinateInput;
+}
+
+/**
+ * Setup all control handlers
+ */
+function setupControlHandlers() {
+    setupRadiusControl();
+    setupWindowSizeControl();
+    setupEpsilonControl();
 }
 
 // ============= STEP 1 FUNCTIONS =============
@@ -463,6 +512,7 @@ async function processStep2() {
         formData.append('pointY', document.getElementById('pointY').value);
         formData.append('latitude', document.getElementById('step1-latitude').value);
         formData.append('longitude', document.getElementById('step1-longitude').value);
+        formData.append('radiusSize', '1'); //tbd revital
 
         document.getElementById('uploadStatus').textContent = 'Processing step 2...';
         const result = await fetch('/process_step2', {
@@ -505,33 +555,51 @@ async function processStep3() {
     }
 }
 
-// ============= STEPS 100 & 5 FUNCTIONS =============
+// ============= STEPS 4 FUNCTIONS =============
 
 /**
- * Steps 100 & 5: Processes pixel density and identifies main shape
- * Creates black mask and identifies the main field shape
+ * Step 4: Process pixel density
+ * Creates black mask based on pixel density analysis
  */
-async function processStep100And5() {
+async function processStep4() {
     try {
         const formData = new FormData();
         formData.append('windowSize', '1');
         
-        const step100Result = await fetch('/process_step100', {
+        const result = await fetch('/process_step4', {
             method: 'POST',
             body: formData
         }).then(response => response.text());
-        if (step100Result !== 'success') throw new Error('Step 100 failed');
         
-        const step5Result = await fetch('/process_step5').then(response => response.text());
-        if (step5Result !== 'success') throw new Error('Step 5 failed');
+        if (result !== 'success') throw new Error('Step 4 failed');
+
+        updateStepImages(document.getElementById('densityMaskImage'), 'step4_density_mask.jpg');
+        document.getElementById('step4Status').textContent = 'Processing complete!';
+        document.getElementById('step4Next').disabled = false;
+        moveToNextStep('step4');
+    } catch (error) {
+        showErrorPopup('Step 4', error);
+        document.getElementById('step4Status').textContent = 'Error: ' + error.message;
+    }
+}
+
+// ============= STEP 5 FUNCTIONS =============
+/**
+ * Step 5: Identify main shape
+ * Identifies the main field shape containing the selected point
+ */
+async function processStep5() {
+    try {
+        const result = await fetch('/process_step5').then(response => response.text());
+        if (result !== 'success') throw new Error('Step 5 failed');
         
         updateStepImages(document.getElementById('mainShapeImage'), 'step5_main_shape.jpg');
         document.getElementById('step5Status').textContent = 'Processing complete!';
         document.getElementById('step5Next').disabled = false;
         moveToNextStep('step5');
     } catch (error) {
-        showErrorPopup('Steps 100 & 5', error);
-        document.getElementById('step3Status').textContent = 'Error: ' + error.message;
+        showErrorPopup('Step 5', error);
+        document.getElementById('step4Status').textContent = 'Error: ' + error.message;
     }
 }
 
@@ -604,68 +672,35 @@ async function processStep8() {
     }
 }
 
-// ============= AUTOMATIC PROCESSING =============
+// ============= CONTROL FUNCTIONS =============
 
 /**
- * All Steps: Processes all steps automatically
- * Runs steps 1-7 in sequence when "Run All Steps" is clicked
+ * Setup radius control
  */
-async function processAllSteps() {
-    try {
-        await processStep2();
-        await processStep3();
-        await processStep100And5();
-        await processStep6();
-        await processStep7();
-        await processStep8();
-        
-        enableAllButtons();
-        document.getElementById('step8').scrollIntoView({ behavior: 'smooth' });
-        
-    } catch (error) {
-        showErrorPopup('Automatic Processing', error);
-        alert('Error during automatic processing: ' + error.message);
-    }
+function setupRadiusControl() {
+    document.getElementById('radiusSize').oninput = function() {
+        document.getElementById('radiusSizeValue').textContent = this.value + 'px';
+    };
 }
 
 /**
- * Generic step processor that handles all steps
- * @param {number} stepNumber - The step number to process
+ * Setup window size control
  */
-async function processStep(stepNumber) {
-    try {
-        switch(stepNumber) {
-            case 2:
-                await processStep2();
-                break;
-            case 3:
-                await processStep3();
-                break;
-            case 5:
-                await processStep100And5();
-                break;
-            case 6:
-                await processStep6();
-                break;
-            case 7:
-                await processStep7();
-                break;
-            case 8:
-                await processStep8();
-                break;
-            default:
-                throw new Error(`Invalid step number: ${stepNumber}`);
-        }
-    } catch (error) {
-        console.error(`Error in Step ${stepNumber}:`, error);
-        const statusElement = document.getElementById(`step${stepNumber}Status`);
-        if (statusElement) {
-            statusElement.textContent = 'Error: ' + error.message;
-        }
-    }
+function setupWindowSizeControl() {
+    document.getElementById('windowSize').oninput = function() {
+        document.getElementById('windowSizeValue').textContent = this.value + 'px';
+    };
 }
 
-// ============= EVENT LISTENERS =============
+/**
+ * Setup epsilon control
+ */
+function setupEpsilonControl() {
+    document.getElementById('epsilonFactor').oninput = function() {
+        const value = parseFloat(this.value).toFixed(4);
+        document.getElementById('epsilonValue').textContent = value;
+    };
+}
 
 document.addEventListener('DOMContentLoaded', function() {
     // Check if elements exist
@@ -703,6 +738,10 @@ document.addEventListener('DOMContentLoaded', function() {
     if (step1Lng) step1Lng.oninput = handleCoordinateInput;
 
     // Window size controls
+    document.getElementById('radiusSize').oninput = function() {
+        document.getElementById('radiusSizeValue').textContent = this.value + 'px';
+    };
+    // Window size controls
     document.getElementById('windowSize').oninput = function() {
         document.getElementById('windowSizeValue').textContent = this.value + 'px';
     };
@@ -713,33 +752,50 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('epsilonValue').textContent = value;
     };
 
+    document.getElementById('applyRadiusSize').onclick = async function() {
+        const radiusSize = document.getElementById('radiusSize').value;
+        document.getElementById('step2Status').textContent = 'Processing...';
+        document.getElementById('step2Next').disabled = true;
+        
+        const formData = new FormData();
+        formData.append('radiusSize', radiusSize);
+        
+        const step2Result = await fetch('/process_step2', {
+            method: 'POST',
+            body: formData
+        }).then(response => response.text());   
+
+        if (step2Result !== 'success') {
+            throw new Error('Step 2 failed');
+        }   
+        
+        updateStepImages(document.getElementById('processedImage'), 'step2_processed_image.jpg');
+        document.getElementById('step2Status').textContent = `Processing complete! (Window size: ${windowSize}px)`;
+        document.getElementById('step2Next').disabled = false;
+    }
+
     // Apply window size button
     document.getElementById('applyWindowSize').onclick = async function() {
         try {
             const windowSize = document.getElementById('windowSize').value;
-            document.getElementById('step5Status').textContent = 'Processing...';
-            document.getElementById('step5Next').disabled = true;
+            document.getElementById('step4Status').textContent = 'Processing...';
+            document.getElementById('step4Next').disabled = true;
             
             const formData = new FormData();
             formData.append('windowSize', windowSize);
             
-            const step3Result = await fetch('/process_step100', {
+            const step4Result = await fetch('/process_step4', {
                 method: 'POST',
                 body: formData
             }).then(response => response.text());
             
-            if (step3Result !== 'success') {
-                throw new Error('Step 3 failed');
+            if (step4Result !== 'success') {
+                throw new Error('Step 4 failed');
             }
             
-            const step5Result = await fetch('/process_step5').then(response => response.text());
-            if (step5Result !== 'success') {
-                throw new Error('Step 5 failed');
-            }
-            
-            updateStepImages(document.getElementById('mainShapeImage'), 'step5_main_shape.jpg');
-            document.getElementById('step5Status').textContent = `Processing complete! (Window size: ${windowSize}px)`;
-            document.getElementById('step5Next').disabled = false;
+            updateStepImages(document.getElementById('densityMaskImage'), 'step4_density_mask.jpg');
+            document.getElementById('step4Status').textContent = `Processing complete! (Window size: ${windowSize}px)`;
+            document.getElementById('step4Next').disabled = false;
         } catch (error) {
             console.error('Error:', error);
             document.getElementById('step5Status').textContent = 'Error: ' + error.message;

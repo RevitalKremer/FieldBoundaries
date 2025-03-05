@@ -58,6 +58,9 @@ def step1_process_image_with_point(image_path, point_coords):
 
 def process_step2():
     try:
+       # Get window size from request
+        radius_size = int(request.form.get('radiusSize', 5))
+ 
         # Get the image data from the form
         image_path = None
         
