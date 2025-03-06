@@ -2,6 +2,7 @@
 let map;
 let currentMarker = null;
 let currentStep = 'step0';
+let mapOptions;  // Will be initialized after Google Maps loads
 
 // ============= UTILITY FUNCTIONS =============
 
@@ -36,38 +37,68 @@ function moveToNextStep(nextStepId) {
     
     setCurrentStep(nextStepId);
     
-    // Wait for all images in the step to load before scrolling
-    const images = nextStep.getElementsByTagName('img');
-    if (images.length > 0) {
-        let loadedImages = 0;
-        const totalImages = images.length;
+    // Function to perform scrolling
+    const scrollToStep = () => {
+        const rect = nextStep.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
         
-        const scrollAfterLoad = () => {
-            loadedImages++;
-            if (loadedImages === totalImages) {
-                // All images loaded, now scroll
-                const rect = nextStep.getBoundingClientRect();
-                const viewportHeight = window.innerHeight;
-                
-                if (rect.height < viewportHeight) {
-                    nextStep.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                } else {
-                    nextStep.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            }
-        };
+        if (rect.height < viewportHeight) {
+            nextStep.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+            nextStep.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
 
+    // Wait for all images and maps in the step to load before scrolling
+    const images = nextStep.getElementsByTagName('img');
+    const maps = nextStep.getElementsByClassName('map-container');
+    let totalElements = images.length + maps.length;
+    let loadedElements = 0;
+
+    const checkAllLoaded = () => {
+        loadedElements++;
+        if (loadedElements === totalElements) {
+            // Add a small delay to ensure maps are fully rendered
+            setTimeout(scrollToStep, 100);
+        }
+    };
+
+    // Handle image loading
+    if (images.length > 0) {
         Array.from(images).forEach(img => {
             if (img.complete) {
-                scrollAfterLoad();
+                checkAllLoaded();
             } else {
-                img.onload = scrollAfterLoad;
-                img.onerror = scrollAfterLoad; // Count errors too to avoid hanging
+                img.onload = checkAllLoaded;
+                img.onerror = checkAllLoaded; // Count errors too to avoid hanging
             }
         });
-    } else {
-        // No images, scroll immediately
-        nextStep.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // Handle map loading
+    if (maps.length > 0) {
+        Array.from(maps).forEach(mapContainer => {
+            // Check if this is step9's result map
+            if (nextStepId === 'step9' && mapContainer.id === 'resultMap') {
+                // For step9, we'll let processStep9 handle the scrolling
+                checkAllLoaded();
+            } else {
+                // For other maps, check if they're loaded
+                const mapElement = mapContainer.querySelector('.map');
+                if (mapElement && mapElement.offsetParent !== null) {
+                    // Map is visible and loaded
+                    checkAllLoaded();
+                } else {
+                    // Wait a bit for the map to initialize
+                    setTimeout(checkAllLoaded, 100);
+                }
+            }
+        });
+    }
+
+    // If no images or maps, scroll immediately
+    if (totalElements === 0) {
+        scrollToStep();
     }
 }
 
@@ -128,16 +159,72 @@ function showErrorPopup(stepName, error) {
  */
 function initMap() {
     try {
-        map = new google.maps.Map(document.getElementById('map'), {
-            center: { lat: 32.90113196474662, lng: 35.12035674668466 },
-            zoom: 17,
+        // Initialize map options after Google Maps API is loaded
+        mapOptions = {
             mapTypeId: 'satellite',
-            mapTypeControl: false
+            
+            // Controls visibility
+            mapTypeControl: false,      // Remove map/satellite switch
+            streetViewControl: false,    // Remove street view
+            fullscreenControl: true,     // Keep fullscreen option
+            zoomControl: true,          // Show zoom buttons
+            scaleControl: true,         // Show scale bar
+            rotateControl: false,       // Remove rotate control
+            
+            // Control positions and options
+            zoomControlOptions: {
+                position: google.maps.ControlPosition.RIGHT_CENTER
+            },
+            scaleControlOptions: {
+                position: google.maps.ControlPosition.BOTTOM_RIGHT
+            },
+            fullscreenControlOptions: {
+                position: google.maps.ControlPosition.TOP_RIGHT
+            },
+            
+            // Additional map options
+            clickableIcons: false,      // Disable POI clicks
+            disableDoubleClickZoom: true, // Disable double-click zoom
+            draggable: true,            // Allow map dragging
+            keyboardShortcuts: false,   // Disable keyboard controls
+            minZoom: 10,                // Set minimum zoom level
+            maxZoom: 21,                // Set maximum zoom level
+            zoom: 19                    // Set default zoom level
+        };
+
+        // Get initial coordinates from input fields or use defaults
+        const lat = parseFloat(document.getElementById('latitude').value) || 31;
+        const lng = parseFloat(document.getElementById('longitude').value) || 31;
+        
+        // Set initial center based on input coordinates or default
+        const initialCenter = (!isNaN(lat) && !isNaN(lng) && 
+                             lat >= -90 && lat <= 90 && 
+                             lng >= -180 && lng <= 180) 
+            ? { lat: lat, lng: lng }
+            : { lat: 32.90113196474662, lng: 35.12035674668466 };
+
+        map = new google.maps.Map(document.getElementById('map'), {
+            ...mapOptions,
+            center: initialCenter
         });
+
+        // Update zoom slider to match default zoom from mapOptions
+        document.getElementById('zoomSlider').value = mapOptions.zoom;
+        document.getElementById('zoomLevel').textContent = mapOptions.zoom;
 
         setupMapControls();
         setupMapEventListeners();
         setCurrentStep('step0');
+
+        // After map is initialized, simulate a click at the coordinates
+        if (!isNaN(lat) && !isNaN(lng) && 
+            lat >= -90 && lat <= 90 && 
+            lng >= -180 && lng <= 180) {
+            // Create a LatLng object for the click event
+            const latLng = new google.maps.LatLng(lat, lng);
+            // Simulate the click event
+            handleMapClick({ latLng: latLng });
+        }
         
     } catch (error) {
         handleMapInitError(error);
@@ -149,8 +236,10 @@ function initMap() {
  * Manages the zoom slider and zoom level display
  */
 function setupMapControls() {
-    document.getElementById('zoomSlider').value = 17;
-    document.getElementById('zoomLevel').textContent = '17';
+    // Initialize zoom slider with map's current zoom
+    const currentZoom = map.getZoom();
+    document.getElementById('zoomSlider').value = currentZoom;
+    document.getElementById('zoomLevel').textContent = currentZoom;
 
     map.addListener('zoom_changed', function() {
         const zoom = map.getZoom();
@@ -162,6 +251,22 @@ function setupMapControls() {
         const zoom = parseInt(this.value);
         map.setZoom(zoom);
         document.getElementById('zoomLevel').textContent = zoom;
+    });
+
+    document.getElementById('latitude').addEventListener('input', function() {
+        const lat = parseFloat(this.value);
+        const lng = parseFloat(document.getElementById('longitude').value);
+        if (!isNaN(lat) && lat >= -90 && lat <= 90 && !isNaN(lng) && lng >= -180 && lng <= 180) {
+            map.setCenter({ lat: lat, lng: map.getCenter().lng() });
+        }
+    });
+
+    document.getElementById('longitude').addEventListener('input', function() {
+        const lng = parseFloat(this.value);
+        const lat = parseFloat(document.getElementById('latitude').value);
+        if (!isNaN(lng) && lng >= -180 && lng <= 180) {
+            map.setCenter({ lat: map.getCenter().lat(), lng: lng });
+        }
     });
 }
 
@@ -289,8 +394,8 @@ function handleImageLoad(selectedLat, selectedLng, lat, lng, zoom, radius = 50) 
     step1Lng.disabled = true;
     
     // Calculate point position using fixed dimensions
-    const imageWidth = 640;
-    const imageHeight = 640;
+    const imageWidth = document.getElementById('map').offsetWidth;
+    const imageHeight = document.getElementById('map').offsetHeight;
     const centerPoint = project(parseFloat(selectedLat), parseFloat(selectedLng), zoom);
     const imageCenter = project(lat, lng, zoom);
     
@@ -322,7 +427,6 @@ function handleImageLoad(selectedLat, selectedLng, lat, lng, zoom, radius = 50) 
     }
     
     showAndEnableStep('step1');
-    clearMapMarker();
 }
 
 /**
@@ -349,8 +453,8 @@ function processStep0() {
     const radiusSize = document.getElementById('radiusSize')?.value || 50;
 
     // Create URL for static map
-    const width = 640;
-    const height = 640;
+    const width = document.getElementById('map').offsetWidth;
+    const height = document.getElementById('map').offsetHeight;
     const url = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${width}x${height}&maptype=satellite&key=${googleMapsApiKey}`;
 
     // Create an image element and set its source
@@ -990,11 +1094,9 @@ async function processStep9() {
 
         // Initialize the result map with exact same properties as initial map
         const resultMap = new google.maps.Map(document.getElementById('resultMap'), {
+            ...mapOptions,
             zoom: initialZoom,  // Set zoom first
-            center: { lat: initialCenter.lat(), lng: initialCenter.lng() },  // Use exact center
-            mapTypeId: 'satellite',
-            streetViewControl: false,
-            fullscreenControl: false
+            center: { lat: initialCenter.lat(), lng: initialCenter.lng() }  // Use exact center
         });
 
         // Wait for the map to be idle before setting bounds and adding features
