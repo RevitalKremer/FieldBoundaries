@@ -1140,6 +1140,16 @@ async function processStep9() {
                 strokeWeight: 2
             });
 
+            // Calculate and display the field area
+            const coordinates = geojsonData.features[0].geometry.coordinates[0];
+            const area = google.maps.geometry.spherical.computeArea(
+                coordinates.map(coord => new google.maps.LatLng(coord[1], coord[0]))
+            );
+
+            // Convert to hectares (1 hectare = 10000 square meters)
+            const areaInHectares = (area / 10000).toFixed(2);
+            document.getElementById('fieldArea').textContent = `${areaInHectares} hectares`;
+
             console.log('Result map properties:', {
                 zoom: resultMap.getZoom(),
                 center: resultMap.getCenter().toJSON(),

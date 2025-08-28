@@ -30,7 +30,7 @@
         const googleMapsApiKey = "{{ google_maps_api_key }}";
     </script>
     <script async defer
-        src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=drawing&callback=initializeMap">
+        src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=drawing,geometry&callback=initializeMap">
     </script>
     <script src="{{ url_for('static', filename='js/findboundaries.js', v=timestamp) }}"></script>
 </head>
@@ -375,6 +375,9 @@
                 <label>Zoom:</label>
                 <input type="range" id="resultZoomSlider" min="1" max="21" value="17">
                 <span id="resultZoomLevel">17</span>
+            </div>
+            <div id="areaDisplay" class="area-display">
+                <p><strong>Field Area:</strong> <span id="fieldArea">Calculating...</span></p>
             </div>
         </div>
         <div class="button-container">

@@ -290,3 +290,22 @@ body {
 .range-value {
     margin-left: 5px;
 } 
+
+.area-display {
+    margin-top: 10px;
+    padding: 10px;
+    background: #f5f5f5;
+    border-radius: 4px;
+    font-size: 16px;
+    text-align: center;
+    border: 1px solid #e0e0e0;
+}
+
+.area-display p {
+    margin: 0;
+    color: #333;
+}
+
+.area-display strong {
+    color: #1976D2;
+} 

@@ -32,6 +32,13 @@ app = Flask(__name__, static_folder='static')
 # Get Google Maps API key from environment
 GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
 
+# Check if API key is set
+if not GOOGLE_MAPS_API_KEY:
+    print("WARNING: GOOGLE_MAPS_API_KEY environment variable is not set!")
+    print("Please set it using: export GOOGLE_MAPS_API_KEY='your_api_key_here'")
+    print("Or create a .env file with: GOOGLE_MAPS_API_KEY=your_api_key_here")
+    GOOGLE_MAPS_API_KEY = ""  # Set to empty string to avoid None
+
 if not os.path.exists('images'):
     os.makedirs('images')
 
@@ -154,4 +161,4 @@ def get_geojson():
         return jsonify({'error': str(e)})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=5002, debug=True)
