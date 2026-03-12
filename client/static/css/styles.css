@@ -1,130 +1,131 @@
-body {
-    font-family: Arial, sans-serif;
+* {
     margin: 0;
     padding: 0;
-    width: 100%;
-}
-
-.step-row {
-    display: grid;
-    grid-template-columns: 20% 60% 20%;
-    gap: 20px;
-    align-items: start;
-    margin-bottom: 20px;
-    padding: 20px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    min-height: 300px;
-    background-color: #ffffff;
-    width: 100%;
     box-sizing: border-box;
 }
 
-.operation {
-    text-align: left;
-    padding: 20px;
-    background-color: #f5f5f5;
-    border-radius: 5px;
+html, body {
+    width: 100%;
     height: 100%;
-}
-
-.operation h3 {
-    margin-top: 0;
-    color: #333;
-}
-
-.button-container {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-    padding: 20px;
-    align-items: center;
-    justify-content: flex-start;
-    height: 100%;
-}
-
-.next-button {
-    background-color: #4CAF50;
-    color: white;
-    padding: 12px 24px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    width: 80%;
-    font-size: 14px;
-    text-align: center;
-    margin: 0 auto;
-}
-
-.next-button:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-}
-
-.hidden {
-    display: none;
-}
-
-.step-instructions {
-    margin-top: 15px;
-    font-size: 14px;
-}
-
-.step-instructions ol {
-    margin: 10px 0;
-    padding-left: 20px;
-}
-
-.step-instructions li {
-    margin: 5px 0;
-}
-
-.operation strong {
-    color: #2196F3;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
 }
 
 #map {
-    width: 640px;
-    height: 640px;
-    margin: 0 auto 10px;
-    border-radius: 5px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
 }
 
-.map-controls {
+/* ── Search bar ── */
+#search-bar {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    width: min(420px, calc(100% - 24px));
+}
+
+#searchInput {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 15px;
+    border: none;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    outline: none;
+}
+
+/* ── Bottom bar ── */
+#bottom-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(6px);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+#status-row {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 5px 0;
-    width: 100%;
-    margin: 10px auto 0;
+    flex: 1;
+    min-width: 0;
 }
 
-.map-container {
+#loader {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #ccc;
+    border-top-color: #4CAF50;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+#statusText {
+    font-size: 14px;
+    color: #444;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#fieldArea {
+    font-size: 14px;
+    font-weight: bold;
+    color: #1976D2;
+    white-space: nowrap;
+}
+
+#buttons {
     display: flex;
-    flex-direction: column;
-    background-color: #f9f9f9;
-    border-radius: 5px;
-    padding: 10px;
-    min-height: 300px;
-    width: 100%;
-    box-sizing: border-box;
+    gap: 8px;
+    flex-shrink: 0;
 }
 
-.coordinate-input {
-    display: inline-block;
-    width: 150px;
-    padding: 5px;
-    border: 1px solid #ddd;
+#buttons button {
+    padding: 9px 16px;
+    border: none;
     border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    white-space: nowrap;
 }
 
-.coordinate-label {
-    display: inline-block;
-    width: 70px;
+#runBtn {
+    background-color: #4CAF50;
+    color: white;
 }
 
-.coordinate-container {
-    margin-bottom: 10px;
+#runBtn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+#downloadBtn {
+    background-color: #1976D2;
+    color: white;
+}
+
+#downloadBtn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
 }
 
 .error-container {
@@ -135,25 +136,17 @@ body {
     border-radius: 5px;
 }
 
-.error-container h4 {
-    margin-top: 0;
-}
+/* ── Mobile ── */
+@media (max-width: 480px) {
+    #status-row {
+        width: 100%;
+    }
 
-.area-display {
-    margin-top: 10px;
-    padding: 10px;
-    background: #f5f5f5;
-    border-radius: 4px;
-    font-size: 16px;
-    text-align: center;
-    border: 1px solid #e0e0e0;
-}
+    #buttons {
+        width: 100%;
+    }
 
-.area-display p {
-    margin: 0;
-    color: #333;
-}
-
-.area-display strong {
-    color: #1976D2;
+    #buttons button {
+        flex: 1;
+    }
 }

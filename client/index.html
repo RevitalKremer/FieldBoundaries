@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Field Boundaries – SAM</title>
+    <title>Field Boundaries</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <script>
         function initializeMap() { initMap(); }
@@ -19,56 +20,32 @@
     </script>
     <script src="{{ url_for('static', filename='js/app.js', v=timestamp) }}"></script>
     <script async defer
-        src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=drawing,geometry&callback=initializeMap">
+        src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=geometry&callback=initializeMap">
     </script>
 </head>
 <body>
 
     <!-- Hidden pipeline fields -->
-    <input type="hidden" id="pointX">
-    <input type="hidden" id="pointY">
-    <input type="hidden" id="selectedLat">
-    <input type="hidden" id="selectedLng">
+    <input type="hidden" id="latitude">
+    <input type="hidden" id="longitude">
     <img id="previewImage" src="" alt="" style="display:none">
 
-    <div class="step-row" id="step0">
-        <div class="operation">
-            <h3>Field Boundary Detection</h3>
-            <div class="step-instructions">
-                <p><strong>Instructions:</strong></p>
-                <ol>
-                    <li>Navigate to a field on the map</li>
-                    <li>Click inside the field to select a point</li>
-                    <li>Click "Detect Boundary"</li>
-                </ol>
-                <p><strong>Status:</strong> <span id="mapStatus">Select a point on the map</span></p>
-                <p id="pipelineStatusRow" style="display:none"><strong>Progress:</strong> <span id="pipelineStatus"></span></p>
-                <div style="margin-top: 15px;">
-                    <div class="coordinate-container">
-                        <label for="latitude" class="coordinate-label">Latitude:</label>
-                        <input type="number" id="latitude" name="latitude" step="0.000001" placeholder="-90 to 90" class="coordinate-input">
-                    </div>
-                    <div class="coordinate-container">
-                        <label for="longitude" class="coordinate-label">Longitude:</label>
-                        <input type="number" id="longitude" name="longitude" step="0.000001" placeholder="-180 to 180" class="coordinate-input">
-                    </div>
-                </div>
-            </div>
+    <div id="map"></div>
+
+    <div id="search-bar">
+        <input id="searchInput" type="text" placeholder="Search location…" onkeydown="if(event.key==='Enter') searchLocation()">
+        <button onclick="searchLocation()">&#x2315;</button>
+    </div>
+
+    <div id="bottom-bar">
+        <div id="status-row">
+            <span id="loader" style="display:none"></span>
+            <span id="statusText">Click on the map to select a point inside a field</span>
+            <span id="fieldArea" style="display:none"></span>
         </div>
-        <div class="map-container">
-            <div id="map"></div>
-            <div class="map-controls">
-                <label>Zoom:</label>
-                <input type="range" id="zoomSlider" min="1" max="21" value="17">
-                <span id="zoomLevel">17</span>
-            </div>
-            <div id="resultInfo" class="area-display" style="display:none;">
-                <p><strong>Field Area:</strong> <span id="fieldArea">—</span></p>
-            </div>
-        </div>
-        <div class="button-container">
-            <button class="next-button" id="runBtn" onclick="detectBoundary()" disabled>Detect Boundary</button>
-            <button class="next-button" id="downloadBtn" onclick="window.location.href='/download_geojson'" disabled style="margin-top: 10px;">Download GeoJSON</button>
+        <div id="buttons">
+            <button id="runBtn" onclick="detectBoundary()" disabled>Detect Boundary</button>
+            <button id="downloadBtn" onclick="window.location.href='/download_geojson'" disabled>Download GeoJSON</button>
         </div>
     </div>
 
