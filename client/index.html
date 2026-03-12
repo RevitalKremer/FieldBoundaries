@@ -2,7 +2,7 @@
 <html>
 <head>
     <title>Field Boundaries – SAM</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/findboundaries.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <script>
         function initializeMap() { initMap(); }
 
@@ -17,7 +17,7 @@
 
         const googleMapsApiKey = "{{ google_maps_api_key }}";
     </script>
-    <script src="{{ url_for('static', filename='js/fieldboundaries_sam.js', v=timestamp) }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js', v=timestamp) }}"></script>
     <script async defer
         src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=drawing,geometry&callback=initializeMap">
     </script>
@@ -27,13 +27,9 @@
     <!-- Hidden pipeline fields -->
     <input type="hidden" id="pointX">
     <input type="hidden" id="pointY">
-    <input type="hidden" id="step1-latitude">
-    <input type="hidden" id="step1-longitude">
-    <input type="hidden" id="radiusSize" value="40">
+    <input type="hidden" id="selectedLat">
+    <input type="hidden" id="selectedLng">
     <img id="previewImage" src="" alt="" style="display:none">
-    <span id="samStatus" style="display:none"></span>
-    <button id="samNext" style="display:none"></button>
-    <img id="samResultImage" style="display:none">
 
     <div class="step-row" id="step0">
         <div class="operation">
@@ -71,7 +67,7 @@
             </div>
         </div>
         <div class="button-container">
-            <button class="next-button" id="runBtn" onclick="processStep0()" disabled>Detect Boundary</button>
+            <button class="next-button" id="runBtn" onclick="detectBoundary()" disabled>Detect Boundary</button>
             <button class="next-button" id="downloadBtn" onclick="window.location.href='/download_geojson'" disabled style="margin-top: 10px;">Download GeoJSON</button>
         </div>
     </div>

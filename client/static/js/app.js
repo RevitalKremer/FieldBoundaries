@@ -14,7 +14,7 @@ function project(lat, lng) {
 }
 
 function setPipelineStatus(msg) {
-    const row = document.getElementById('pipelineStatusRow');
+    const row  = document.getElementById('pipelineStatusRow');
     const span = document.getElementById('pipelineStatus');
     if (!span) return;
     if (msg) {
@@ -81,16 +81,6 @@ function initMap() {
                 map.setCenter({ lat: map.getCenter().lat(), lng: ln });
         });
 
-        map.addListener('tilesloaded', () => {
-            const mapDiv = document.getElementById('map');
-            if (!mapDiv.innerHTML.toLowerCase().includes('sorry')) {
-                const runBtn = document.getElementById('runBtn');
-                if (runBtn && !runBtn.disabled && !currentMarker) {
-                    // tiles loaded but no point yet — keep disabled
-                }
-            }
-        });
-
         map.addListener('click', (e) => {
             const la = e.latLng.lat();
             const ln = e.latLng.lng();
@@ -111,9 +101,8 @@ function initMap() {
         });
 
         if (!isNaN(lat) && lat >= -90 && lat <= 90 && !isNaN(lng) && lng >= -180 && lng <= 180) {
-            const latLng = new google.maps.LatLng(lat, lng);
             currentMarker = new google.maps.Marker({
-                position: latLng, map,
+                position: new google.maps.LatLng(lat, lng), map,
                 icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#FF0000', fillOpacity: 1.0, strokeColor: '#FFFFFF', strokeWeight: 2, scale: 8 }
             });
             document.getElementById('latitude').value = lat;
@@ -129,7 +118,7 @@ function initMap() {
 
 // ============= PIPELINE =============
 
-async function processStep0() {
+async function detectBoundary() {
     const selectedLat = document.getElementById('latitude').value;
     const selectedLng = document.getElementById('longitude').value;
     if (!selectedLat || !selectedLng) {
@@ -140,23 +129,20 @@ async function processStep0() {
     document.getElementById('runBtn').disabled = true;
     document.getElementById('downloadBtn').disabled = true;
     document.getElementById('resultInfo').style.display = 'none';
-    map.data.forEach(f => map.data.remove(f)); // clear any previous boundary
+    map.data.forEach(f => map.data.remove(f));
     setPipelineStatus('Capturing image...');
 
     const center = map.getCenter();
-    const lat = center.lat();
-    const lng = center.lng();
-    const zoom = map.getZoom();
-
-    const width = document.getElementById('map').offsetWidth;
+    const lat    = center.lat();
+    const lng    = center.lng();
+    const zoom   = map.getZoom();
+    const width  = document.getElementById('map').offsetWidth;
     const height = document.getElementById('map').offsetHeight;
-    const url = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${width}x${height}&maptype=satellite&key=${googleMapsApiKey}`;
+    const url    = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${width}x${height}&maptype=satellite&key=${googleMapsApiKey}`;
 
     const img = document.getElementById('previewImage');
-    img.onload = function() {
-        runPipeline(selectedLat, selectedLng, lat, lng, zoom);
-    };
-    img.onerror = function() {
+    img.onload  = () => runPipeline(selectedLat, selectedLng, lat, lng, zoom);
+    img.onerror = () => {
         setPipelineStatus('');
         document.getElementById('runBtn').disabled = false;
         alert('Failed to capture the area. Please try again.');
@@ -166,58 +152,52 @@ async function processStep0() {
 
 async function runPipeline(selectedLat, selectedLng, lat, lng, zoom) {
     try {
-        // Compute pixel coordinates of the selected point within the captured image
-        const img = document.getElementById('previewImage');
-        const imageWidth = img.naturalWidth || document.getElementById('map').offsetWidth;
+        const img         = document.getElementById('previewImage');
+        const imageWidth  = img.naturalWidth  || document.getElementById('map').offsetWidth;
         const imageHeight = img.naturalHeight || document.getElementById('map').offsetHeight;
 
         const centerPoint = project(parseFloat(selectedLat), parseFloat(selectedLng));
         const imageCenter = project(lat, lng);
         const offsetX = (centerPoint.x - imageCenter.x) * 256 * Math.pow(2, zoom);
         const offsetY = (centerPoint.y - imageCenter.y) * 256 * Math.pow(2, zoom);
-        const pointX = Math.round((imageWidth / 2) + offsetX);
-        const pointY = Math.round((imageHeight / 2) + offsetY);
+        const pointX  = Math.round((imageWidth  / 2) + offsetX);
+        const pointY  = Math.round((imageHeight / 2) + offsetY);
 
         console.log(`[runPipeline] image: ${imageWidth}x${imageHeight}, point: (${pointX}, ${pointY})`);
 
-        document.getElementById('step1-latitude').value = selectedLat;
-        document.getElementById('step1-longitude').value = selectedLng;
-
-        // Step 1: upload image + point
+        // Upload image + point metadata
         setPipelineStatus('Uploading image...');
         const formData = new FormData();
-        const response = await fetch(img.src);
-        const blob = await response.blob();
-        formData.append('image', blob, 'preview_image.jpg');
+        const blob = await fetch(img.src).then(r => r.blob());
+        formData.append('image', blob, 'image.jpg');
         formData.append('pointX', pointX);
         formData.append('pointY', pointY);
         formData.append('latitude', selectedLat);
         formData.append('longitude', selectedLng);
         formData.append('zoom', zoom);
-        formData.append('radiusSize', 40);
 
         const bounds = map.getBounds().toJSON();
         formData.append('bounds[north]', bounds.north);
         formData.append('bounds[south]', bounds.south);
-        formData.append('bounds[east]', bounds.east);
-        formData.append('bounds[west]', bounds.west);
+        formData.append('bounds[east]',  bounds.east);
+        formData.append('bounds[west]',  bounds.west);
         formData.append('center[lat]', lat);
         formData.append('center[lng]', lng);
 
         const uploadResult = await fetch('/upload_image', { method: 'POST', body: formData }).then(r => r.text());
         if (uploadResult !== 'success') throw new Error(uploadResult);
 
-        // Step 2: run SAM
+        // Run SAM segmentation
         setPipelineStatus('Running SAM segmentation... (this may take a moment)');
         const samResult = await fetch('/run_segmentation').then(r => r.text());
         if (samResult !== 'success') throw new Error(samResult);
 
-        // Step 3: convert pixel GeoJSON to geo coordinates
+        // Convert pixel coordinates to geo coordinates
         setPipelineStatus('Converting to map coordinates...');
-        const step9Result = await fetch('/convert_to_geojson').then(r => r.text());
-        if (step9Result !== 'success') throw new Error(step9Result);
+        const geoResult = await fetch('/convert_to_geojson').then(r => r.text());
+        if (geoResult !== 'success') throw new Error(geoResult);
 
-        // Draw result on the existing map
+        // Draw boundary on map
         setPipelineStatus('Drawing boundary...');
         const geojsonData = await fetch('/download_geojson').then(r => r.json());
         map.data.addGeoJson(geojsonData);
@@ -226,7 +206,6 @@ async function runPipeline(selectedLat, selectedLng, lat, lng, zoom) {
             strokeColor: '#00BCD4', strokeWeight: 2
         });
 
-        // Compute and display area
         const coordinates = geojsonData.features[0].geometry.coordinates[0];
         const area = google.maps.geometry.spherical.computeArea(
             coordinates.map(coord => new google.maps.LatLng(coord[1], coord[0]))

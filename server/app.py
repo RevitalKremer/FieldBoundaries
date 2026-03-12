@@ -6,7 +6,7 @@ except ImportError:
     raise
 
 from flask import Flask, render_template, request, send_file
-from steps.step_sam import process_step_sam
+from sam import run_segmentation
 
 import cv2
 import json
@@ -16,21 +16,27 @@ import time
 
 load_dotenv()
 
-app = Flask(__name__, static_folder='static')
+BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+IMAGES_DIR  = os.path.join(BASE_DIR, 'images')
+POINT_DATA  = os.path.join(BASE_DIR, 'point_data.json')
+
+app = Flask(__name__,
+            template_folder=os.path.join(BASE_DIR, 'client'),
+            static_folder=os.path.join(BASE_DIR, 'client', 'static'),
+            static_url_path='/static')
 
 GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY', '')
 if not GOOGLE_MAPS_API_KEY:
     print("WARNING: GOOGLE_MAPS_API_KEY is not set in .env")
 
-if not os.path.exists('images'):
-    os.makedirs('images')
+os.makedirs(IMAGES_DIR, exist_ok=True)
 
 
 # ============= ROUTES =============
 
 @app.route('/')
 def index():
-    return render_template('fieldboundaries_sam.html',
+    return render_template('index.html',
                            google_maps_api_key=GOOGLE_MAPS_API_KEY,
                            timestamp=int(time.time()))
 
@@ -45,12 +51,11 @@ def upload_image():
         point_x = int(request.form.get('pointX'))
         point_y = int(request.form.get('pointY'))
 
-        image.save('images/uploaded_image.jpg')
+        image.save(os.path.join(IMAGES_DIR, 'uploaded_image.jpg'))
 
         point_data = {
             'cX': point_x,
             'cY': point_y,
-            'radius': int(request.form.get('radiusSize', 40)),
             'latitude': request.form.get('latitude'),
             'longitude': request.form.get('longitude'),
             'zoom': request.form.get('zoom'),
@@ -65,7 +70,7 @@ def upload_image():
                 'lng': float(request.form.get('center[lng]'))
             }
         }
-        with open('point_data.json', 'w') as f:
+        with open(POINT_DATA, 'w') as f:
             json.dump(point_data, f)
 
         return 'success'
@@ -74,23 +79,29 @@ def upload_image():
         return str(e)
 
 
+@app.route('/run_segmentation')
+def run_segmentation_route():
+    return run_segmentation()
+
+
 @app.route('/convert_to_geojson')
 def convert_to_geojson():
     try:
-        with open('point_data.json', 'r') as f:
+        with open(POINT_DATA, 'r') as f:
             point_data = json.load(f)
-        with open('images/field_boundary.geojson', 'r') as f:
+        with open(os.path.join(IMAGES_DIR, 'field_boundary.geojson'), 'r') as f:
             geojson = json.load(f)
 
         pixel_coords = geojson['features'][0]['geometry']['coordinates'][0]
-        center_lat = float(point_data['center']['lat'])
-        center_lng = float(point_data['center']['lng'])
-        zoom = int(point_data['zoom'])
+        center_lat   = float(point_data['center']['lat'])
+        center_lng   = float(point_data['center']['lng'])
+        zoom         = int(point_data['zoom'])
+
+        img = cv2.imread(os.path.join(IMAGES_DIR, 'uploaded_image.jpg'))
+        w, h = (img.shape[1], img.shape[0]) if img is not None else (640, 640)
 
         def pixel_to_latlng(px, py):
-            mpp = 156543.03392 * math.cos(center_lat * math.pi / 180) / math.pow(2, zoom)
-            img = cv2.imread('images/uploaded_image.jpg')
-            w, h = (img.shape[1], img.shape[0]) if img is not None else (640, 640)
+            mpp  = 156543.03392 * math.cos(center_lat * math.pi / 180) / math.pow(2, zoom)
             dlat = ((h / 2 - py) * mpp) / 111111
             dlng = ((px - w / 2) * mpp) / (111111 * math.cos(center_lat * math.pi / 180))
             return center_lat + dlat, center_lng + dlng
@@ -113,7 +124,7 @@ def convert_to_geojson():
             }
         }
 
-        with open('images/field_boundary.geojson', 'w') as f:
+        with open(os.path.join(IMAGES_DIR, 'field_boundary.geojson'), 'w') as f:
             json.dump(geojson, f)
 
         return 'success'
@@ -122,16 +133,10 @@ def convert_to_geojson():
         return str(e)
 
 
-@app.route('/run_segmentation')
-def run_segmentation():
-    return process_step_sam()
-
-
-
 @app.route('/download_geojson')
 def download_geojson():
     try:
-        return send_file('images/field_boundary.geojson',
+        return send_file(os.path.join(IMAGES_DIR, 'field_boundary.geojson'),
                          mimetype='application/geo+json',
                          as_attachment=True,
                          download_name='field_boundary.geojson')
