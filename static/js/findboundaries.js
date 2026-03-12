@@ -452,6 +452,19 @@ function processStep0() {
     // Get initial radius size
     const radiusSize = document.getElementById('radiusSize')?.value || 50;
 
+    // [Debug] Use locally uploaded image if provided
+    const debugInput = document.getElementById('debugImageInput');
+    if (debugInput && debugInput.files && debugInput.files[0]) {
+        const img = document.getElementById('previewImage');
+        img.onload = function() {
+            console.log('[Debug] Local image loaded');
+            handleImageLoad(selectedLat, selectedLng, lat, lng, zoom, radiusSize);
+        };
+        img.src = URL.createObjectURL(debugInput.files[0]);
+        img.style.display = 'block';
+        return;
+    }
+
     // Create URL for static map
     const width = document.getElementById('map').offsetWidth;
     const height = document.getElementById('map').offsetHeight;
@@ -459,9 +472,9 @@ function processStep0() {
 
     // Create an image element and set its source
     const img = document.getElementById('previewImage');
-    
+
     console.log('Loading image:', url);
-    
+
     img.onload = function() {
         console.log('Image loaded successfully');
         handleImageLoad(selectedLat, selectedLng, lat, lng, zoom, radiusSize);
@@ -474,7 +487,7 @@ function processStep0() {
 
     img.src = url;
     img.style.display = 'block';
-    
+
     console.log('Capture process initiated');
 }
 

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Field Boundaries – SAM3</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/findboundaries.css') }}">
+    <script>
+        function initializeMap() { initMap(); }
+
+        function gm_authFailure() {
+            document.getElementById('map').innerHTML = `
+                <div class="error-container">
+                    <h4>Google Maps API Error</h4>
+                    <p>Please configure the Google Maps API key.</p>
+                </div>`;
+            document.getElementById('step0Next').disabled = true;
+        }
+
+        const googleMapsApiKey = "{{ google_maps_api_key }}";
+    </script>
+    <script src="{{ url_for('static', filename='js/fieldboundaries_sam.js', v=timestamp) }}"></script>
+    <script async defer
+        src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=drawing,geometry&callback=initializeMap">
+    </script>
+</head>
+<body>
+
+    <!-- STEP 0: Select location on map -->
+    <div class="step-row" id="step0">
+        <div class="operation">
+            <h3>Select Location</h3>
+            <div class="step-instructions">
+                <p><strong>Instructions:</strong></p>
+                <ol>
+                    <li>Navigate to your desired location</li>
+                    <li>Click on the map to select a point</li>
+                    <li>Click "Capture This Area" when ready</li>
+                </ol>
+                <p><strong>Status:</strong> <span id="mapStatus">Select a point on the map</span></p>
+                <div style="margin-top: 15px;">
+                    <div class="coordinate-container">
+                        <label for="latitude" class="coordinate-label">Latitude:</label>
+                        <input type="number" id="latitude" name="latitude" step="0.000001" placeholder="-90 to 90" class="coordinate-input" required>
+                    </div>
+                    <div class="coordinate-container">
+                        <label for="longitude" class="coordinate-label">Longitude:</label>
+                        <input type="number" id="longitude" name="longitude" step="0.000001" placeholder="-180 to 180" class="coordinate-input" required>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="map-controls">
+                <label>Zoom:</label>
+                <input type="range" id="zoomSlider" min="1" max="21" value="17">
+                <span id="zoomLevel">17</span>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="step0Next" onclick="processStep0()" disabled>Capture This Area</button>
+            <div style="margin-top: 10px; font-size: 0.85em; color: #888;">
+                <label><strong>[Debug]</strong> Skip capture — use local image:</label>
+                <input type="file" id="debugImageInput" accept="image/*" style="margin-top: 4px;">
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 1: Upload / mark image -->
+    <div class="step-row hidden" id="step1">
+        <div class="operation">
+            <h3>Step 1: Upload and Mark Image</h3>
+            <div class="step-instructions">
+                <p><strong>Instructions:</strong></p>
+                <div class="captured-image-section">
+                    <h4>Captured Image Path</h4>
+                    <ol>
+                        <li>The coordinates will be automatically filled</li>
+                        <li>The point marker will be placed automatically</li>
+                        <li>Click "Run SAM3" to continue</li>
+                    </ol>
+                </div>
+                <div class="separator"></div>
+                <div class="upload-section">
+                    <h4>Upload Image Path</h4>
+                    <ol>
+                        <li>Select a satellite image file</li>
+                        <li>Click on the image to mark a point inside the field</li>
+                        <li>Enter the latitude and longitude of the marked point</li>
+                        <li>Click "Run SAM3" to continue</li>
+                    </ol>
+                </div>
+                <p><strong>Status:</strong> <span id="uploadStatus">Select an image to begin</span></p>
+                <p><strong>Status:</strong> <span id="step1Status"></span></p>
+            </div>
+            <form id="uploadForm">
+                <div class="file-input-container">
+                    <input type="file" name="image" accept="image/*" id="imageInput">
+                </div>
+                <input type="hidden" name="pointX" id="pointX">
+                <input type="hidden" name="pointY" id="pointY">
+                <div class="coordinates-section">
+                    <div class="coordinate-container">
+                        <label for="step1-latitude" class="coordinate-label">Latitude:</label>
+                        <input type="number" id="step1-latitude" name="latitude" step="0.000001" placeholder="-90 to 90" class="coordinate-input" required>
+                    </div>
+                    <div class="coordinate-container">
+                        <label for="step1-longitude" class="coordinate-label">Longitude:</label>
+                        <input type="number" id="step1-longitude" name="longitude" step="0.000001" placeholder="-180 to 180" class="coordinate-input" required>
+                    </div>
+                </div>
+            </form>
+            <!-- Radius slider (used internally by /process_step2) -->
+            <p style="display:none"><input type="range" id="radiusSize" min="10" max="100" value="40"><span id="radiusSizeValue">40px</span></p>
+        </div>
+        <div class="image-preview-container">
+            <img id="previewImage" src="" alt="Preview">
+            <div id="pointMarker" class="point-marker"></div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="step1Next" onclick="processStep1ToSAM()" disabled>Run SAM3</button>
+        </div>
+    </div>
+
+    <!-- SAM STEP -->
+    <div class="step-row hidden" id="stepSam">
+        <div class="operation">
+            <h3>SAM2: Segment Anything</h3>
+            <div class="step-instructions">
+                <p><strong>Goal:</strong> Use Meta's SAM2 model to segment the field boundary from the selected point.</p>
+                <p><strong>Process:</strong></p>
+                <ul>
+                    <li>Loading SAM3 model (first run may be slow)</li>
+                    <li>Running segmentation with point prompt</li>
+                    <li>Extracting field boundary contour</li>
+                    <li>Cyan overlay shows the detected field</li>
+                </ul>
+                <p><strong>Status:</strong> <span id="samStatus">Waiting...</span></p>
+            </div>
+        </div>
+        <div class="image-container">
+            <div>
+                <img id="samResultImage" src="" alt="SAM3 Result">
+                <div class="image-label">SAM3 Segmentation</div>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="samNext" onclick="processStep9()" disabled>Show on Map</button>
+        </div>
+    </div>
+
+    <!-- STEP 9: Result map -->
+    <div class="step-row hidden" id="step9">
+        <div class="operation">
+            <h3>Step 9: Field Boundary Map</h3>
+            <div class="step-instructions">
+                <p><strong>Goal:</strong> Display the field boundary on an interactive map.</p>
+                <p><strong>Process:</strong></p>
+                <ul>
+                    <li>Loading the generated GeoJSON</li>
+                    <li>Displaying boundary on satellite map</li>
+                    <li>Allowing interactive exploration</li>
+                </ul>
+                <p><strong>Status:</strong> <span id="step9Status">Waiting to process...</span></p>
+            </div>
+        </div>
+        <div class="map-container">
+            <div id="resultMap"></div>
+            <div class="map-controls">
+                <label>Zoom:</label>
+                <input type="range" id="resultZoomSlider" min="1" max="21" value="17">
+                <span id="resultZoomLevel">17</span>
+            </div>
+            <div id="areaDisplay" class="area-display">
+                <p><strong>Field Area:</strong> <span id="fieldArea">Calculating...</span></p>
+            </div>
+        </div>
+        <div class="button-container">
+            <button class="next-button" id="step9Next" onclick="window.location.href='/download_geojson'" disabled>Download GeoJSON</button>
+        </div>
+    </div>
+
+</body>
+</html>

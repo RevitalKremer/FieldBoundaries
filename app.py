@@ -19,6 +19,7 @@ from steps.step6 import process_step6
 from steps.step7 import process_step7
 from steps.step8 import process_step8
 from steps.step9 import process_step9, get_geojson
+from steps.step_sam import process_step_sam
 
 import os
 from geojson import Feature, Polygon, FeatureCollection
@@ -87,6 +88,18 @@ def create_gray_overlay(image_path, opacity=0.5):
         return overlay
     except Exception:
         return False
+
+@app.route('/sam')
+def sam():
+    return render_template('fieldboundaries_sam.html',
+                           google_maps_api_key=GOOGLE_MAPS_API_KEY,
+                           timestamp=get_timestamp())
+
+
+@app.route('/process_step_sam')
+def process_step_sam_route():
+    return process_step_sam()
+
 
 @app.route('/')
 def index():

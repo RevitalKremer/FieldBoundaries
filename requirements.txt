@@ -9,3 +9,7 @@ opencv-python>=4.0.0
 numpy>=1.19.0
 geojson>=3.0.0
 python-dotenv>=1.0.0
+Pillow>=10.0.0
+torch>=2.7.0
+torchvision>=0.20.0
+transformers>=4.50.0
