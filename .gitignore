@@ -38,3 +38,4 @@ __pycache__/
 .env
 venv/ 
 *.npy
+.DS_Store
