@@ -5,7 +5,7 @@ let mapOptions;
 
 // ============= UTILITY FUNCTIONS =============
 
-function project(lat, lng, zoom) {
+function project(lat, lng) {
     const siny = Math.sin((lat * Math.PI) / 180);
     return {
         x: (lng + 180) / 360,
@@ -171,8 +171,8 @@ async function runPipeline(selectedLat, selectedLng, lat, lng, zoom) {
         const imageWidth = img.naturalWidth || document.getElementById('map').offsetWidth;
         const imageHeight = img.naturalHeight || document.getElementById('map').offsetHeight;
 
-        const centerPoint = project(parseFloat(selectedLat), parseFloat(selectedLng), zoom);
-        const imageCenter = project(lat, lng, zoom);
+        const centerPoint = project(parseFloat(selectedLat), parseFloat(selectedLng));
+        const imageCenter = project(lat, lng);
         const offsetX = (centerPoint.x - imageCenter.x) * 256 * Math.pow(2, zoom);
         const offsetY = (centerPoint.y - imageCenter.y) * 256 * Math.pow(2, zoom);
         const pointX = Math.round((imageWidth / 2) + offsetX);
@@ -204,17 +204,17 @@ async function runPipeline(selectedLat, selectedLng, lat, lng, zoom) {
         formData.append('center[lat]', lat);
         formData.append('center[lng]', lng);
 
-        const uploadResult = await fetch('/process_step2', { method: 'POST', body: formData }).then(r => r.text());
+        const uploadResult = await fetch('/upload_image', { method: 'POST', body: formData }).then(r => r.text());
         if (uploadResult !== 'success') throw new Error(uploadResult);
 
         // Step 2: run SAM
         setPipelineStatus('Running SAM segmentation... (this may take a moment)');
-        const samResult = await fetch('/process_step_sam').then(r => r.text());
+        const samResult = await fetch('/run_segmentation').then(r => r.text());
         if (samResult !== 'success') throw new Error(samResult);
 
         // Step 3: convert pixel GeoJSON to geo coordinates
         setPipelineStatus('Converting to map coordinates...');
-        const step9Result = await fetch('/process_step9').then(r => r.text());
+        const step9Result = await fetch('/convert_to_geojson').then(r => r.text());
         if (step9Result !== 'success') throw new Error(step9Result);
 
         // Draw result on the existing map
