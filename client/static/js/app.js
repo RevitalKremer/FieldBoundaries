@@ -44,6 +44,7 @@ function initMap() {
                 map
             });
             document.getElementById('runBtn').disabled = false;
+            document.getElementById('runServerBtn').disabled = false;
             setStatus('Point selected — click "Detect Boundary" to continue.', false);
         });
 
@@ -149,6 +150,64 @@ async function runPipeline(selectedLat, selectedLng, zoom, bounds) {
         console.error('Pipeline error:', error);
         setStatus('Error: ' + error.message, false);
         document.getElementById('runBtn').disabled = false;
+    }
+}
+
+async function detectBoundaryServer() {
+    const selectedLat = document.getElementById('latitude').value;
+    const selectedLng = document.getElementById('longitude').value;
+    if (!selectedLat || !selectedLng) {
+        alert('Please click on the map to select a point first.');
+        return;
+    }
+
+    document.getElementById('runBtn').disabled = true;
+    document.getElementById('runServerBtn').disabled = true;
+    document.getElementById('downloadBtn').disabled = true;
+    document.getElementById('fieldArea').style.display = 'none';
+    map.data.forEach(f => map.data.remove(f));
+
+    const zoom   = map.getZoom();
+    const bounds = map.getBounds().toJSON();
+
+    try {
+        setStatus('Running server-side segmentation… (this may take a moment)');
+        const samResult = await fetch('/run_segmentation_by_map_location', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lat: parseFloat(selectedLat), lng: parseFloat(selectedLng), bounds, zoom })
+        }).then(r => r.text());
+        if (samResult !== 'success') throw new Error(samResult);
+
+        setStatus('Converting to map coordinates...');
+        const geoResult = await fetch('/convert_to_geojson').then(r => r.text());
+        if (geoResult !== 'success') throw new Error(geoResult);
+
+        setStatus('Drawing boundary...');
+        const geojsonData = await fetch('/download_geojson').then(r => r.json());
+        map.data.addGeoJson(geojsonData);
+        map.data.setStyle({
+            fillColor: '#00BCD4', fillOpacity: 0.3,
+            strokeColor: '#00BCD4', strokeWeight: 2
+        });
+
+        const coordinates = geojsonData.features[0].geometry.coordinates[0];
+        const area = google.maps.geometry.spherical.computeArea(
+            coordinates.map(coord => new google.maps.LatLng(coord[1], coord[0]))
+        );
+        const areaEl = document.getElementById('fieldArea');
+        areaEl.textContent = `Field area: ${(area / 10000).toFixed(2)} ha`;
+        areaEl.style.display = '';
+        document.getElementById('downloadBtn').disabled = false;
+        document.getElementById('runBtn').disabled = false;
+        document.getElementById('runServerBtn').disabled = false;
+        setStatus('Boundary detected. Click a new point to run again.', false);
+
+    } catch (error) {
+        console.error('Pipeline error:', error);
+        setStatus('Error: ' + error.message, false);
+        document.getElementById('runBtn').disabled = false;
+        document.getElementById('runServerBtn').disabled = false;
     }
 }
 

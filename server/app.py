@@ -6,7 +6,7 @@ except ImportError:
     raise
 
 from flask import Flask, render_template, request, send_file
-from sam import run_segmentation
+from sam import run_segmentation, run_segmentation_by_map_location
 
 import cv2
 import json
@@ -82,6 +82,20 @@ def upload_image():
 @app.route('/run_segmentation')
 def run_segmentation_route():
     return run_segmentation()
+
+
+@app.route('/run_segmentation_by_map_location', methods=['POST'])
+def run_segmentation_by_map_location_route():
+    try:
+        data   = request.get_json(force=True)
+        lat    = float(data['lat'])
+        lng    = float(data['lng'])
+        bounds = data['bounds']   # {north, south, east, west}
+        zoom   = int(data['zoom'])
+        return run_segmentation_by_map_location(lat, lng, bounds, zoom)
+    except Exception as e:
+        print(f"Error in run_segmentation_by_map_location: {e}")
+        return str(e), 400
 
 
 @app.route('/convert_to_geojson')
