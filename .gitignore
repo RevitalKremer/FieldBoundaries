@@ -39,3 +39,4 @@ __pycache__/
 venv/ 
 *.npy
 .DS_Store
+.DS_Store
