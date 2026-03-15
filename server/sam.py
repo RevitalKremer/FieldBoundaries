@@ -7,6 +7,38 @@ BASE_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 IMAGES_DIR = os.path.join(BASE_DIR, 'images')
 POINT_DATA = os.path.join(BASE_DIR, 'point_data.json')
 
+MAX_POLYGON_POINTS = 25
+
+
+def smooth_mask(mask):
+    """Smooth a binary SAM mask with morphological ops + Gaussian blur."""
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN,  kernel, iterations=1)
+    blurred = cv2.GaussianBlur(mask, (9, 9), 0)
+    _, mask = cv2.threshold(blurred, 127, 255, cv2.THRESH_BINARY)
+    return mask
+
+
+def limit_contour_points(contour, max_points=MAX_POLYGON_POINTS):
+    """Simplify a contour to at most max_points using adaptive Douglas-Peucker."""
+    perimeter  = cv2.arcLength(contour, True)
+    epsilon    = 0.001 * perimeter
+    simplified = cv2.approxPolyDP(contour, epsilon, True)
+
+    if len(simplified) > max_points:
+        lo, hi = epsilon, perimeter
+        for _ in range(20):
+            mid       = (lo + hi) / 2
+            candidate = cv2.approxPolyDP(contour, mid, True)
+            if len(candidate) <= max_points:
+                simplified = candidate
+                hi = mid
+            else:
+                lo = mid
+
+    return simplified
+
 
 def run_segmentation_by_map_location(lat, lng, bounds, zoom):
     """
@@ -22,7 +54,6 @@ def run_segmentation_by_map_location(lat, lng, bounds, zoom):
     Writes uploaded_image.jpg, sam_result.jpg, field_boundary.geojson, and point_data.json.
     """
     try:
-        import math
         import requests as http_requests
         import torch
         from PIL import Image
@@ -32,18 +63,17 @@ def run_segmentation_by_map_location(lat, lng, bounds, zoom):
         api_key = os.environ.get('GOOGLE_MAPS_API_KEY', '')
         IMG_SIZE = 640
 
-        center_lat = (bounds['north'] + bounds['south']) / 2
-        center_lng = (bounds['east']  + bounds['west'])  / 2
-
+        # Center the static map on the clicked point — same as the client does —
+        # so the seed pixel is always at image center and both methods see the same tile.
         static_url = (
             "https://maps.googleapis.com/maps/api/staticmap"
-            f"?center={center_lat},{center_lng}"
+            f"?center={lat},{lng}"
             f"&zoom={zoom}"
             f"&size={IMG_SIZE}x{IMG_SIZE}"
             f"&maptype=satellite"
             f"&key={api_key}"
         )
-        print(f"[SAM2] Fetching static map: center=({center_lat},{center_lng}) zoom={zoom}")
+        print(f"[SAM2] Fetching static map: center=({lat},{lng}) zoom={zoom}")
         resp = http_requests.get(static_url, timeout=15)
         resp.raise_for_status()
 
@@ -51,15 +81,9 @@ def run_segmentation_by_map_location(lat, lng, bounds, zoom):
         image_path = os.path.join(IMAGES_DIR, 'uploaded_image.jpg')
         pil_image.save(image_path)
 
-        # Convert lat/lng → pixel using the same meters-per-pixel formula
-        mpp     = 156543.03392 * math.cos(center_lat * math.pi / 180) / math.pow(2, zoom)
-        w, h    = pil_image.width, pil_image.height
-        dlat    = lat - center_lat
-        dlng    = lng - center_lng
-        point_x = int(w / 2 + (dlng * 111111 * math.cos(center_lat * math.pi / 180)) / mpp)
-        point_y = int(h / 2 - (dlat * 111111) / mpp)
-        point_x = max(0, min(point_x, w - 1))
-        point_y = max(0, min(point_y, h - 1))
+        # Clicked point is at image center
+        point_x = pil_image.width  // 2
+        point_y = pil_image.height // 2
         print(f"[SAM2] Seed pixel: ({point_x}, {point_y})")
 
         point_data = {
@@ -69,7 +93,7 @@ def run_segmentation_by_map_location(lat, lng, bounds, zoom):
             'longitude': lng,
             'zoom':      zoom,
             'bounds':    bounds,
-            'center':   {'lat': center_lat, 'lng': center_lng}
+            'center':   {'lat': lat, 'lng': lng}
         }
         with open(POINT_DATA, 'w') as f:
             json.dump(point_data, f)
@@ -103,6 +127,8 @@ def run_segmentation_by_map_location(lat, lng, bounds, zoom):
         mask = cv2.resize(best_mask, (pil_image.width, pil_image.height),
                           interpolation=cv2.INTER_NEAREST)
 
+        mask = smooth_mask(mask)
+
         cv_image = cv2.imread(image_path)
         overlay  = cv_image.copy()
         overlay[mask > 0] = [0, 200, 200]
@@ -114,8 +140,7 @@ def run_segmentation_by_map_location(lat, lng, bounds, zoom):
             return 'No contour found in SAM2 mask'
 
         main_contour = max(contours, key=cv2.contourArea)
-        epsilon      = 0.001 * cv2.arcLength(main_contour, True)
-        simplified   = cv2.approxPolyDP(main_contour, epsilon, True)
+        simplified   = limit_contour_points(main_contour)
 
         coordinates = simplified.reshape(-1, 2).tolist()
         coordinates.append(coordinates[0])
@@ -184,6 +209,8 @@ def run_segmentation():
         mask = cv2.resize(best_mask, (pil_image.width, pil_image.height),
                           interpolation=cv2.INTER_NEAREST)
 
+        mask = smooth_mask(mask)
+
         cv_image = cv2.imread(image_path)
         overlay  = cv_image.copy()
         overlay[mask > 0] = [0, 200, 200]
@@ -195,8 +222,7 @@ def run_segmentation():
             return 'No contour found in SAM2 mask'
 
         main_contour = max(contours, key=cv2.contourArea)
-        epsilon      = 0.001 * cv2.arcLength(main_contour, True)
-        simplified   = cv2.approxPolyDP(main_contour, epsilon, True)
+        simplified   = limit_contour_points(main_contour)
 
         coordinates = simplified.reshape(-1, 2).tolist()
         coordinates.append(coordinates[0])
