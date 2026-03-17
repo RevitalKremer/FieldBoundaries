@@ -6,7 +6,7 @@ except ImportError:
     raise
 
 from flask import Flask, render_template, request, send_file
-from sam import run_segmentation, run_segmentation_by_map_location
+from sam import run_segmentation, run_segmentation_by_map_location, get_polygon_by_map_location
 
 import cv2
 import json
@@ -95,6 +95,23 @@ def run_segmentation_by_map_location_route():
         return run_segmentation_by_map_location(lat, lng, bounds, zoom)
     except Exception as e:
         print(f"Error in run_segmentation_by_map_location: {e}")
+        return str(e), 400
+
+
+@app.route('/get_polygon_by_map_location', methods=['POST'])
+def get_polygon_by_map_location_route():
+    try:
+        data   = request.get_json(force=True)
+        lat    = float(data['lat'])
+        lng    = float(data['lng'])
+        bounds = data['bounds']
+        zoom   = int(data['zoom'])
+        result = get_polygon_by_map_location(lat, lng, bounds, zoom)
+        if isinstance(result, str):
+            return result, 400
+        return result
+    except Exception as e:
+        print(f"Error in get_polygon_by_map_location: {e}")
         return str(e), 400
 
 

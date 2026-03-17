@@ -40,6 +40,56 @@ def limit_contour_points(contour, max_points=MAX_POLYGON_POINTS):
     return simplified
 
 
+def get_polygon_by_map_location(lat, lng, bounds, zoom):
+    """
+    Single-call version: runs segmentation + pixel→geo conversion and returns
+    the GeoJSON FeatureCollection directly (dict), or an error string.
+    """
+    import math
+
+    result = run_segmentation_by_map_location(lat, lng, bounds, zoom)
+    if result != 'success':
+        return result
+
+    with open(POINT_DATA, 'r') as f:
+        point_data = json.load(f)
+    with open(os.path.join(IMAGES_DIR, 'field_boundary.geojson'), 'r') as f:
+        geojson = json.load(f)
+
+    pixel_coords = geojson['features'][0]['geometry']['coordinates'][0]
+    center_lat   = float(point_data['center']['lat'])
+    center_lng   = float(point_data['center']['lng'])
+    zoom_level   = int(point_data['zoom'])
+    img          = cv2.imread(os.path.join(IMAGES_DIR, 'uploaded_image.jpg'))
+    w, h         = (img.shape[1], img.shape[0]) if img is not None else (640, 640)
+
+    def pixel_to_latlng(px, py):
+        mpp  = 156543.03392 * math.cos(center_lat * math.pi / 180) / math.pow(2, zoom_level)
+        dlat = ((h / 2 - py) * mpp) / 111111
+        dlng = ((px - w / 2) * mpp) / (111111 * math.cos(center_lat * math.pi / 180))
+        return center_lat + dlat, center_lng + dlng
+
+    geo_coords = []
+    for x, y in pixel_coords:
+        lat_c, lng_c = pixel_to_latlng(x, y)
+        geo_coords.append([lng_c, lat_c])
+    if geo_coords[0] != geo_coords[-1]:
+        geo_coords.append(geo_coords[0])
+
+    geojson['features'][0]['geometry']['coordinates'] = [geo_coords]
+    geojson['features'][0]['properties'] = {
+        'bounds': point_data['bounds'],
+        'center': {'lat': center_lat, 'lng': center_lng},
+        'zoom': zoom_level,
+        'selected_point': {'lat': lat, 'lng': lng}
+    }
+
+    with open(os.path.join(IMAGES_DIR, 'field_boundary.geojson'), 'w') as f:
+        json.dump(geojson, f)
+
+    return geojson
+
+
 def run_segmentation_by_map_location(lat, lng, bounds, zoom):
     """
     Take a server-side satellite screenshot via Google Static Maps API, then run SAM2.
