@@ -5,10 +5,11 @@ except ImportError:
     print("Please install it using: pip install python-dotenv\n")
     raise
 
-from flask import Flask, render_template, request, send_file
-from sam import run_segmentation, run_segmentation_by_map_location, get_polygon_by_map_location
+from flask import Flask, render_template, request, send_file, jsonify
+from sam import (run_segmentation, run_segmentation_by_map_location,
+                 get_polygon_by_map_location, make_job_id, job_dir,
+                 pixel_geojson_to_geo)
 
-import cv2
 import json
 import math
 import os
@@ -16,9 +17,8 @@ import time
 
 load_dotenv()
 
-BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-IMAGES_DIR  = os.path.join(BASE_DIR, 'images')
-POINT_DATA  = os.path.join(BASE_DIR, 'point_data.json')
+BASE_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+IMAGES_DIR = os.path.join(BASE_DIR, 'images')
 
 app = Flask(__name__,
             template_folder=os.path.join(BASE_DIR, 'client'),
@@ -48,17 +48,27 @@ def upload_image():
         if not image:
             return 'Error: No image provided'
 
+        lat    = float(request.form.get('latitude'))
+        lng    = float(request.form.get('longitude'))
+        zoom   = int(request.form.get('zoom'))
+        jid    = make_job_id(lat, lng, zoom)
+        d      = job_dir(jid)
+
         point_x = int(request.form.get('pointX'))
         point_y = int(request.form.get('pointY'))
 
-        image.save(os.path.join(IMAGES_DIR, 'uploaded_image.jpg'))
+        img_path = os.path.join(d, 'uploaded_image.jpg')
+        image.save(img_path)
+
+        # Get image dimensions for pixel→geo conversion
+        import cv2
+        img = cv2.imread(img_path)
+        w, h = (img.shape[1], img.shape[0]) if img is not None else (640, 640)
 
         point_data = {
-            'cX': point_x,
-            'cY': point_y,
-            'latitude': request.form.get('latitude'),
-            'longitude': request.form.get('longitude'),
-            'zoom': request.form.get('zoom'),
+            'cX': point_x, 'cY': point_y,
+            'latitude': lat, 'longitude': lng,
+            'zoom': zoom,
             'bounds': {
                 'north': float(request.form.get('bounds[north]')),
                 'south': float(request.form.get('bounds[south]')),
@@ -68,20 +78,24 @@ def upload_image():
             'center': {
                 'lat': float(request.form.get('center[lat]')),
                 'lng': float(request.form.get('center[lng]'))
-            }
+            },
+            'image_size': [w, h]
         }
-        with open(POINT_DATA, 'w') as f:
+        with open(os.path.join(d, 'point_data.json'), 'w') as f:
             json.dump(point_data, f)
 
-        return 'success'
+        return jid   # job_id — client passes this to subsequent calls
     except Exception as e:
         print(f"Error in upload_image: {e}")
-        return str(e)
+        return f'Error: {e}'
 
 
 @app.route('/run_segmentation')
 def run_segmentation_route():
-    return run_segmentation()
+    job_id = request.args.get('job_id')
+    if not job_id:
+        return 'Error: job_id required', 400
+    return run_segmentation(job_id)
 
 
 @app.route('/run_segmentation_by_map_location', methods=['POST'])
@@ -90,9 +104,12 @@ def run_segmentation_by_map_location_route():
         data   = request.get_json(force=True)
         lat    = float(data['lat'])
         lng    = float(data['lng'])
-        bounds = data['bounds']   # {north, south, east, west}
+        bounds = data['bounds']
         zoom   = int(data['zoom'])
-        return run_segmentation_by_map_location(lat, lng, bounds, zoom)
+        result = run_segmentation_by_map_location(lat, lng, bounds, zoom)
+        if result != 'success':
+            return result, 400
+        return make_job_id(lat, lng, zoom)   # job_id — client passes to convert/download
     except Exception as e:
         print(f"Error in run_segmentation_by_map_location: {e}")
         return str(e), 400
@@ -109,7 +126,7 @@ def get_polygon_by_map_location_route():
         result = get_polygon_by_map_location(lat, lng, bounds, zoom)
         if isinstance(result, str):
             return result, 400
-        return result
+        return jsonify(result)
     except Exception as e:
         print(f"Error in get_polygon_by_map_location: {e}")
         return str(e), 400
@@ -118,44 +135,19 @@ def get_polygon_by_map_location_route():
 @app.route('/convert_to_geojson')
 def convert_to_geojson():
     try:
-        with open(POINT_DATA, 'r') as f:
+        job_id = request.args.get('job_id')
+        if not job_id:
+            return 'Error: job_id required', 400
+
+        d = os.path.join(IMAGES_DIR, job_id)
+        with open(os.path.join(d, 'point_data.json'), 'r') as f:
             point_data = json.load(f)
-        with open(os.path.join(IMAGES_DIR, 'field_boundary.geojson'), 'r') as f:
+        with open(os.path.join(d, 'field_boundary.geojson'), 'r') as f:
             geojson = json.load(f)
 
-        pixel_coords = geojson['features'][0]['geometry']['coordinates'][0]
-        center_lat   = float(point_data['center']['lat'])
-        center_lng   = float(point_data['center']['lng'])
-        zoom         = int(point_data['zoom'])
+        geojson = pixel_geojson_to_geo(geojson, point_data)
 
-        img = cv2.imread(os.path.join(IMAGES_DIR, 'uploaded_image.jpg'))
-        w, h = (img.shape[1], img.shape[0]) if img is not None else (640, 640)
-
-        def pixel_to_latlng(px, py):
-            mpp  = 156543.03392 * math.cos(center_lat * math.pi / 180) / math.pow(2, zoom)
-            dlat = ((h / 2 - py) * mpp) / 111111
-            dlng = ((px - w / 2) * mpp) / (111111 * math.cos(center_lat * math.pi / 180))
-            return center_lat + dlat, center_lng + dlng
-
-        geo_coords = []
-        for x, y in pixel_coords:
-            lat, lng = pixel_to_latlng(x, y)
-            geo_coords.append([lng, lat])
-        if geo_coords[0] != geo_coords[-1]:
-            geo_coords.append(geo_coords[0])
-
-        geojson['features'][0]['geometry']['coordinates'] = [geo_coords]
-        geojson['features'][0]['properties'] = {
-            'bounds': point_data['bounds'],
-            'center': {'lat': center_lat, 'lng': center_lng},
-            'zoom': zoom,
-            'selected_point': {
-                'lat': float(point_data['latitude']),
-                'lng': float(point_data['longitude'])
-            }
-        }
-
-        with open(os.path.join(IMAGES_DIR, 'field_boundary.geojson'), 'w') as f:
+        with open(os.path.join(d, 'field_boundary_geo.geojson'), 'w') as f:
             json.dump(geojson, f)
 
         return 'success'
@@ -167,13 +159,15 @@ def convert_to_geojson():
 @app.route('/download_geojson')
 def download_geojson():
     try:
-        return send_file(os.path.join(IMAGES_DIR, 'field_boundary.geojson'),
-                         mimetype='application/geo+json',
-                         as_attachment=True,
-                         download_name='field_boundary.geojson')
+        job_id = request.args.get('job_id')
+        if not job_id:
+            return 'Error: job_id required', 400
+        geo_path = os.path.join(IMAGES_DIR, job_id, 'field_boundary_geo.geojson')
+        return send_file(geo_path, mimetype='application/geo+json',
+                         as_attachment=True, download_name='field_boundary.geojson')
     except Exception as e:
         return str(e), 400
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5002, debug=True)
+    app.run(host='0.0.0.0', port=5002, debug=True, threaded=True)

@@ -117,19 +117,22 @@ async function runPipeline(selectedLat, selectedLng, zoom, bounds) {
         formData.append('center[lat]', selectedLat);
         formData.append('center[lng]', selectedLng);
 
-        const uploadResult = await fetch('/upload_image', { method: 'POST', body: formData }).then(r => r.text());
-        if (uploadResult !== 'success') throw new Error(uploadResult);
+        const jobResp = await fetch('/upload_image', { method: 'POST', body: formData });
+        const jobId   = await jobResp.text();
+        if (!jobResp.ok || jobId.startsWith('Error')) throw new Error(jobId);
 
         setStatus('Running segmentation… (this may take a moment)');
-        const samResult = await fetch('/run_segmentation').then(r => r.text());
-        if (samResult !== 'success') throw new Error(samResult);
+        const samResp = await fetch(`/run_segmentation?job_id=${jobId}`);
+        const samResult = await samResp.text();
+        if (!samResp.ok || samResult !== 'success') throw new Error(samResult);
 
         setStatus('Converting to map coordinates...');
-        const geoResult = await fetch('/convert_to_geojson').then(r => r.text());
-        if (geoResult !== 'success') throw new Error(geoResult);
+        const geoResp = await fetch(`/convert_to_geojson?job_id=${jobId}`);
+        const geoResult = await geoResp.text();
+        if (!geoResp.ok || geoResult !== 'success') throw new Error(geoResult);
 
         setStatus('Drawing boundary...');
-        const geojsonData = await fetch('/download_geojson').then(r => r.json());
+        const geojsonData = await fetch(`/download_geojson?job_id=${jobId}`).then(r => r.json());
         map.data.addGeoJson(geojsonData);
         map.data.setStyle({
             fillColor: '#00BCD4', fillOpacity: 0.3,
@@ -173,19 +176,21 @@ async function detectBoundaryServer() {
 
     try {
         setStatus('Running server-side segmentation… (this may take a moment)');
-        const samResult = await fetch('/run_segmentation_by_map_location', {
+        const samResp2 = await fetch('/run_segmentation_by_map_location', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ lat: parseFloat(selectedLat), lng: parseFloat(selectedLng), bounds, zoom })
-        }).then(r => r.text());
-        if (samResult !== 'success') throw new Error(samResult);
+        });
+        const jobId = await samResp2.text();
+        if (!samResp2.ok) throw new Error(jobId);
 
         setStatus('Converting to map coordinates...');
-        const geoResult = await fetch('/convert_to_geojson').then(r => r.text());
-        if (geoResult !== 'success') throw new Error(geoResult);
+        const geoResp2 = await fetch(`/convert_to_geojson?job_id=${jobId}`);
+        const geoResult = await geoResp2.text();
+        if (!geoResp2.ok || geoResult !== 'success') throw new Error(geoResult);
 
         setStatus('Drawing boundary...');
-        const geojsonData = await fetch('/download_geojson').then(r => r.json());
+        const geojsonData = await fetch(`/download_geojson?job_id=${jobId}`).then(r => r.json());
         map.data.addGeoJson(geojsonData);
         map.data.setStyle({
             fillColor: '#00BCD4', fillOpacity: 0.3,
