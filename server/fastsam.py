@@ -5,48 +5,49 @@ import os
 import threading
 
 import requests as http_requests
-import torch
 from PIL import Image
 from io import BytesIO
-from transformers import Sam2Processor, Sam2Model
+from ultralytics import FastSAM
 
-from utils import (IMAGES_DIR, MAX_POLYGON_POINTS, make_job_id, job_dir,
+from utils import (IMAGES_DIR, make_job_id, job_dir,
                    smooth_mask, limit_contour_points, pixel_geojson_to_geo)
 
 # ── Model loaded once at startup ──────────────────────────────────────────────
-_device     = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"[SAM2] Loading model on {_device}…")
-_processor  = Sam2Processor.from_pretrained("facebook/sam2-hiera-large")
-_model      = Sam2Model.from_pretrained("facebook/sam2-hiera-large").to(_device)
-_model.eval()
+_device     = "cuda" if __import__('torch').cuda.is_available() else "cpu"
+print("[FastSAM] Loading model…")
+_model      = FastSAM("FastSAM-x.pt")   # downloads weights on first run
 _model_lock = threading.Lock()
-print("[SAM2] Model ready.")
+print("[FastSAM] Model ready.")
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 def _infer(pil_image, point_x, point_y):
-    """Run SAM2 inference. Serialized via lock — safe for threaded Flask."""
-    inputs = _processor(
-        images=pil_image,
-        input_points=[[[[point_x, point_y]]]],
-        input_labels=[[[1]]],
-        return_tensors="pt"
-    ).to(_device)
-
+    """Run FastSAM point-prompt inference. Thread-safe via lock."""
     with _model_lock:
-        with torch.no_grad():
-            outputs = _model(**inputs)
+        results = _model(
+            pil_image,
+            points=[[point_x, point_y]],
+            labels=[1],
+            device=_device,
+            retina_masks=True,
+            imgsz=640,
+            conf=0.4,
+            iou=0.9,
+            verbose=False
+        )
+    return results[0]
 
-    return outputs.pred_masks[0, 0], outputs.iou_scores[0, 0]
 
+def _result_to_pixel_geojson(result, pil_image, jid):
+    """Convert FastSAM result to pixel-coord GeoJSON and save overlay image."""
+    if result.masks is None or len(result.masks.data) == 0:
+        return None, 'FastSAM found no segments for the selected point'
 
-def _masks_to_pixel_geojson(pil_image, pred_masks, scores, jid):
-    """Convert SAM2 output to pixel-coord GeoJSON and save result overlay image."""
-    if pred_masks.shape[0] == 0:
-        return None, 'SAM2 found no segments for the selected point'
-
-    best_mask = pred_masks[int(scores.argmax())].numpy()
-    best_mask = (best_mask > 0).astype(np.uint8) * 255
+    # Pick the largest mask (most likely the field)
+    masks_np = result.masks.data.cpu().numpy()  # (N, H, W)
+    areas    = [m.sum() for m in masks_np]
+    best_mask = masks_np[int(np.argmax(areas))]
+    best_mask = (best_mask > 0.5).astype(np.uint8) * 255
     mask = cv2.resize(best_mask, (pil_image.width, pil_image.height),
                       interpolation=cv2.INTER_NEAREST)
     mask = smooth_mask(mask)
@@ -59,7 +60,7 @@ def _masks_to_pixel_geojson(pil_image, pred_masks, scores, jid):
 
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
-        return None, 'No contour found in SAM2 mask'
+        return None, 'No contour found in FastSAM mask'
 
     simplified  = limit_contour_points(max(contours, key=cv2.contourArea))
     coordinates = simplified.reshape(-1, 2).tolist()
@@ -76,41 +77,40 @@ def _masks_to_pixel_geojson(pil_image, pred_masks, scores, jid):
     return geojson, None
 
 
-# ── Public API ────────────────────────────────────────────────────────────────
+# ── Public API (mirrors sam.py) ───────────────────────────────────────────────
 
 def run_segmentation(job_id):
-    """Client-upload flow: image already saved to job dir; run SAM2."""
+    """Client-upload flow: image already saved to job dir; run FastSAM."""
     try:
         d = job_dir(job_id)
         with open(os.path.join(d, 'point_data.json'), 'r') as f:
             point_data = json.load(f)
 
-        pil_image          = Image.open(os.path.join(d, 'uploaded_image.jpg')).convert('RGB')
-        pred_masks, scores = _infer(pil_image, point_data['cX'], point_data['cY'])
+        pil_image = Image.open(os.path.join(d, 'uploaded_image.jpg')).convert('RGB')
+        result    = _infer(pil_image, point_data['cX'], point_data['cY'])
 
-        geojson, err = _masks_to_pixel_geojson(pil_image, pred_masks, scores, job_id)
+        geojson, err = _result_to_pixel_geojson(result, pil_image, job_id)
         if err:
             return err
 
         with open(os.path.join(d, 'field_boundary.geojson'), 'w') as f:
             json.dump(geojson, f)
 
-        print(f"[SAM2] {job_id}: {len(geojson['features'][0]['geometry']['coordinates'][0])} pts")
+        print(f"[FastSAM] {job_id}: {len(geojson['features'][0]['geometry']['coordinates'][0])} pts")
         return 'success'
     except Exception as e:
-        print(f"[SAM2] run_segmentation error: {e}")
+        print(f"[FastSAM] run_segmentation error: {e}")
         return str(e)
 
 
 def run_segmentation_by_map_location(lat, lng, bounds, zoom):
-    """Server-fetch flow: fetch satellite image, run SAM2, write pixel GeoJSON."""
+    """Server-fetch flow: fetch satellite image, run FastSAM, write pixel GeoJSON."""
     try:
         jid = make_job_id(lat, lng, zoom)
         d   = job_dir(jid)
 
-        # Cache: pixel boundary already computed
         if os.path.exists(os.path.join(d, 'field_boundary.geojson')):
-            print(f"[SAM2] {jid}: pixel cache hit")
+            print(f"[FastSAM] {jid}: pixel cache hit")
             return 'success'
 
         api_key  = os.environ.get('GOOGLE_MAPS_API_KEY', '')
@@ -121,7 +121,7 @@ def run_segmentation_by_map_location(lat, lng, bounds, zoom):
             f"?center={lat},{lng}&zoom={zoom}"
             f"&size={IMG_SIZE}x{IMG_SIZE}&maptype=satellite&key={api_key}"
         )
-        print(f"[SAM2] {jid}: fetching static map")
+        print(f"[FastSAM] {jid}: fetching static map")
         resp = http_requests.get(static_url, timeout=15)
         resp.raise_for_status()
 
@@ -141,18 +141,18 @@ def run_segmentation_by_map_location(lat, lng, bounds, zoom):
         with open(os.path.join(d, 'point_data.json'), 'w') as f:
             json.dump(point_data, f)
 
-        pred_masks, scores = _infer(pil_image, point_x, point_y)
-        geojson, err = _masks_to_pixel_geojson(pil_image, pred_masks, scores, jid)
+        result = _infer(pil_image, point_x, point_y)
+        geojson, err = _result_to_pixel_geojson(result, pil_image, jid)
         if err:
             return err
 
         with open(os.path.join(d, 'field_boundary.geojson'), 'w') as f:
             json.dump(geojson, f)
 
-        print(f"[SAM2] {jid}: {len(geojson['features'][0]['geometry']['coordinates'][0])} pts")
+        print(f"[FastSAM] {jid}: {len(geojson['features'][0]['geometry']['coordinates'][0])} pts")
         return 'success'
     except Exception as e:
-        print(f"[SAM2] run_segmentation_by_map_location error: {e}")
+        print(f"[FastSAM] run_segmentation_by_map_location error: {e}")
         return str(e)
 
 
@@ -163,7 +163,7 @@ def get_polygon_by_map_location(lat, lng, bounds, zoom):
     geo_path = os.path.join(d, 'field_boundary_geo.geojson')
 
     if os.path.exists(geo_path):
-        print(f"[SAM2] {jid}: geo cache hit")
+        print(f"[FastSAM] {jid}: geo cache hit")
         with open(geo_path, 'r') as f:
             return json.load(f)
 
